@@ -71,9 +71,10 @@ Electron + React + [BlockNote](https://blocknotejs.org)（`xl-ai` AI 编辑扩�
 
 ## Roadmap
 
-- [ ] docx 格式支持（导入/导出、修订直写）
+- [x] **变更面板**（v0.2）：汇总每次 AI 修改（指令/涉及块/前后对照/状态），点击跳转到修改位置
+- [x] **docx 支持选型报告**（v0.2）：见 [docs/docx-选型报告.md](docs/docx-选型报告.md)——阶段 A 转换管线（全 MIT，已 PoC 验证）
+- [ ] docx 格式支持（导入/导出，随后 AI 修订直写 Word 修订标记）
 - [ ] 自定义 AI 菜单指令（中文快捷指令）
-- [ ] 编辑器内 diff 变更面板
 - [ ] 应用图标与代码签名
 - [ ] Linux 版
 

@@ -29,12 +29,31 @@ import {
   openFile,
   saveFile,
   setSettings,
-  type ProviderConfig,
   type Settings,
-  testProvider,
 } from "./bridge";
 import { WELCOME_MD } from "./welcome";
 import { SettingsModal, PRESETS } from "./SettingsModal";
+import { useAiChanges, lastInstruction } from "./useAiChanges";
+import { ChangesPanel } from "./ChangesPanel";
+
+// capture the user's instruction from the outgoing AI request body
+const trackingFetch: typeof fetch = async (input, init) => {
+  try {
+    if (init?.body) {
+      const body = JSON.parse(String(init.body));
+      const msgs = Array.isArray(body?.messages) ? body.messages : [];
+      const lastUser = [...msgs].reverse().find((m: any) => m.role === "user");
+      const text = (lastUser?.parts ?? [])
+        .filter((p: any) => p.type === "text")
+        .map((p: any) => p.text)
+        .join(" ");
+      if (text) lastInstruction.text = text.slice(0, 80);
+    }
+  } catch {
+    /* tracking only */
+  }
+  return fetch(input, init);
+};
 
 export function App() {
   const editorRef = useRef<BlockNoteEditor<any, any, any> | null>(null);
@@ -49,7 +68,7 @@ export function App() {
     extensions: [
       AIExtension({
         agentCursor: { name: "AI", color: "#4f8ef7" },
-        transport: new DefaultChatTransport({ api: CHAT_API }),
+        transport: new DefaultChatTransport({ api: CHAT_API, fetch: trackingFetch }),
       }),
     ],
     initialContent: [
@@ -57,6 +76,7 @@ export function App() {
     ],
   });
   editorRef.current = editor;
+  const changes = useAiChanges(editor);
 
   useEffect(() => {
     (async () => {
@@ -71,6 +91,11 @@ export function App() {
     (window as any).__zpaperEditor = editor;
     exposeAutomationHook();
   }, [editor]);
+
+  // keep the automation hook current on every render
+  useEffect(() => {
+    (window as any).__zpaperChanges = changes;
+  });
 
   const activeProvider = settings.providers.find((p) => p.id === settings.activeProviderId);
 
@@ -130,6 +155,9 @@ export function App() {
           <button onClick={onOpen}>打开</button>
           <button onClick={onSave} className="primary">保存</button>
           <span className="divider" />
+          <button onClick={() => changes.setOpen(!changes.open)}>
+            变更{changes.entries.length > 0 ? ` (${changes.entries.length})` : ""}
+          </button>
           <span
             className={"ai-badge" + (activeProvider ? " ok" : "")}
             title={activeProvider ? `${activeProvider.name} · ${activeProvider.model}` : "未配置模型，当前为演示模式"}
@@ -142,8 +170,9 @@ export function App() {
 
       {status && <div className="statusbar">{status}</div>}
 
-      <div className="paper-wrap">
-        <div className="paper">
+      <div className={"main-area" + (changes.open ? " with-panel" : "")}>
+        <div className="paper-wrap">
+          <div className="paper">
           <BlockNoteView
             editor={editor}
             formattingToolbar={false}
@@ -168,7 +197,15 @@ export function App() {
               }
             />
           </BlockNoteView>
+          </div>
         </div>
+        {changes.open && (
+          <ChangesPanel
+            entries={changes.entries}
+            onClose={() => changes.setOpen(false)}
+            onClear={() => changes.clear()}
+          />
+        )}
       </div>
 
       {settingsOpen && (
