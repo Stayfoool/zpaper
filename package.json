@@ -1,7 +1,7 @@
 {
   "name": "zpaper",
   "productName": "zpaper",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "zpaper — AI 帮你写文档的桌面编辑器：选区下达指令，AI 就地改写，修订式高亮，逐处接受/拒绝",
   "license": "GPL-3.0",
   "author": {
@@ -16,6 +16,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:renderer": "vite",
+    "collab": "node server/collab-server.mjs",
     "build:renderer": "vite build",
     "build:main": "node scripts/build-main.mjs",
     "build": "pnpm build:renderer && pnpm build:main",
@@ -32,7 +33,9 @@
     "@blocknote/xl-ai": "0.55.0",
     "ai": "^7.0.127",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "y-protocols": "^1.0.7",
+    "y-websocket": "^3.1.0"
   },
   "devDependencies": {
     "@blocknote/server-util": "^0.55.0",
@@ -45,9 +48,11 @@
     "electron-builder": "^26.0.0",
     "esbuild": ">=0.25.0",
     "html-to-docx": "^1.8.0",
+    "lib0": "^0.2.119",
     "mammoth": "^1.13.0",
     "typescript": "^5.6.0",
     "vite": "^8.0.0",
+    "ws": "^8.22.0",
     "y-prosemirror": "^1.3.7",
     "yjs": "^13.6.33"
   },

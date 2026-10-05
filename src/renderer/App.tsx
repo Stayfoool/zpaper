@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BlockNoteEditor } from "@blocknote/core";
+import { CollaborationExtension } from "@blocknote/core/yjs";
 import { filterSuggestionItems } from "@blocknote/core/extensions";
 import "@blocknote/core/fonts/inter.css";
 import { en, zh } from "@blocknote/core/locales";
 import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/mantine/style.css";
+import * as Y from "yjs";
+import { WebsocketProvider } from "y-websocket";
 import {
   FormattingToolbar,
   FormattingToolbarController,
@@ -35,6 +38,7 @@ import { WELCOME_MD } from "./welcome";
 import { SettingsModal, PRESETS } from "./SettingsModal";
 import { useAiChanges, lastInstruction } from "./useAiChanges";
 import { ChangesPanel } from "./ChangesPanel";
+import { CollabDialog, loadCollab, type CollabConfig } from "./CollabDialog";
 
 // capture the user's instruction from the outgoing AI request body
 const trackingFetch: typeof fetch = async (input, init) => {
@@ -56,12 +60,32 @@ const trackingFetch: typeof fetch = async (input, init) => {
 };
 
 export function App() {
+  const collabCfg = useRef<CollabConfig | null>(loadCollab());
   const editorRef = useRef<BlockNoteEditor<any, any, any> | null>(null);
   const filePath = useRef<string | undefined>(undefined);
-  const [fileName, setFileName] = useState("欢迎");
+  const [fileName, setFileName] = useState(collabCfg.current ? `协作·${collabCfg.current.room}` : "欢迎");
   const [settings, setSettingsState] = useState<Settings>({ providers: [] });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [collabOpen, setCollabOpen] = useState(false);
   const [status, setStatus] = useState("");
+
+  // collaboration (if configured) is wired at editor creation; joining/leaving
+  // saves the config and reloads the page
+  const ydocRef = useRef<Y.Doc | null>(null);
+  const wsRef = useRef<WebsocketProvider | null>(null);
+  let collabOptions: Record<string, any> | undefined;
+  if (collabCfg.current) {
+    const ydoc = new Y.Doc();
+    const provider = new WebsocketProvider(collabCfg.current.server, collabCfg.current.room, ydoc);
+    ydocRef.current = ydoc;
+    wsRef.current = provider;
+    collabOptions = {
+      fragment: ydoc.getXmlFragment("document"),
+      user: { name: collabCfg.current.name, color: collabCfg.current.color },
+      provider: { awareness: provider.awareness },
+      showCursorLabels: "activity",
+    };
+  }
 
   const editor = useCreateBlockNote({
     dictionary: { ...zh, ai: aiZh },
@@ -70,17 +94,49 @@ export function App() {
         agentCursor: { name: "AI", color: "#4f8ef7" },
         transport: new DefaultChatTransport({ api: CHAT_API, fetch: trackingFetch }),
       }),
+      ...(collabOptions ? [CollaborationExtension(collabOptions as any)] : []),
     ],
-    initialContent: [
-      { type: "paragraph", content: "正在加载…" },
-    ],
+    ...(collabCfg.current
+      ? {}
+      : { initialContent: [{ type: "paragraph", content: "正在加载…" }] as any }),
   });
   editorRef.current = editor;
   const changes = useAiChanges(editor);
 
+  // seed the collaborative document if the room is empty (first user)
+  useEffect(() => {
+    if (!collabCfg.current) return;
+    const provider = wsRef.current!;
+    const ydoc = ydocRef.current!;
+    const seed = async () => {
+      const fragment = ydoc.getXmlFragment("document");
+      // BlockNote writes an initial empty paragraph into the fragment, so
+      // "empty room" means: nothing (or one block with no text at all)
+      const doc = editor.document;
+      const isEmpty =
+        fragment.length === 0 ||
+        (doc.length <= 1 && !(doc[0]?.content?.map((c: any) => c.text).join("") || "").trim());
+      if (isEmpty) {
+        try {
+          const blocks = await editor.tryParseMarkdownToBlocks(WELCOME_MD);
+          if (blocks) await editor.replaceBlocks(editor.document, blocks);
+        } catch (e) {
+          console.error("collab seed failed", e);
+        }
+      }
+    };
+    if (provider.synced) seed();
+    else provider.on("sync", (s: boolean) => s && seed());
+    return () => {
+      provider.destroy();
+      ydoc.destroy();
+    };
+  }, [editor]);
+
   useEffect(() => {
     (async () => {
       setSettingsState(await getSettings());
+      if (collabCfg.current) return; // collaborative content comes from the room
       try {
         const blocks = await editor.tryParseMarkdownToBlocks(WELCOME_MD);
         if (blocks) await editor.replaceBlocks(editor.document, blocks);
@@ -158,6 +214,13 @@ export function App() {
           <button onClick={() => changes.setOpen(!changes.open)}>
             变更{changes.entries.length > 0 ? ` (${changes.entries.length})` : ""}
           </button>
+          <button
+            className={collabCfg.current ? "primary" : ""}
+            onClick={() => setCollabOpen(true)}
+            title={collabCfg.current ? `已加入房间 ${collabCfg.current.room}` : "多人协作"}
+          >
+            {collabCfg.current ? `协作·${collabCfg.current.room}` : "协作"}
+          </button>
           <span
             className={"ai-badge" + (activeProvider ? " ok" : "")}
             title={activeProvider ? `${activeProvider.name} · ${activeProvider.model}` : "未配置模型，当前为演示模式"}
@@ -214,6 +277,10 @@ export function App() {
           onCancel={() => setSettingsOpen(false)}
           onSave={onSaveSettings}
         />
+      )}
+
+      {collabOpen && (
+        <CollabDialog current={collabCfg.current} onClose={() => setCollabOpen(false)} />
       )}
     </div>
   );
