@@ -1,5 +1,12 @@
-import { useState } from "react";
-import { testProvider, type ProviderConfig, type Settings } from "./bridge";
+import { useEffect, useState } from "react";
+import {
+  isElectron,
+  pickWorkspace,
+  testProvider,
+  zcodeStatus,
+  type ProviderConfig,
+  type Settings,
+} from "./bridge";
 
 export const PRESETS: Omit<ProviderConfig, "id" | "apiKey">[] = [
   { name: "GLM Coding Plan（z.ai）", protocol: "openai", baseURL: "https://api.z.ai/api/coding/paas/v4", model: "GLM-5.2" },
@@ -24,6 +31,14 @@ export function SettingsModal(props: {
   const [activeId, setActiveId] = useState<string | undefined>(props.initial.activeProviderId);
   const [testing, setTesting] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<Record<string, string>>({});
+  const [workspace, setWorkspace] = useState<{ path?: string; enabled?: boolean }>(
+    props.initial.workspace || {},
+  );
+  const [zcode, setZcode] = useState<{ found: boolean; kind: string | null } | null>(null);
+
+  useEffect(() => {
+    if (isElectron) zcodeStatus().then(setZcode);
+  }, []);
 
   const update = (id: string, patch: Partial<ProviderConfig>) => {
     setProviders((ps) => ps.map((p) => (p.id === id ? { ...p, ...patch } : p)));
@@ -133,11 +148,45 @@ export function SettingsModal(props: {
           ))}
         </div>
 
+        <div className="workspace-box">
+          <label className="radio" style={{ marginBottom: 8 }}>
+            <input
+              type="checkbox"
+              checked={!!workspace.enabled}
+              onChange={(e) => setWorkspace((w) => ({ ...w, enabled: e.target.checked }))}
+            />
+            <b>Agent 模式（实验性）：</b>修改前让本机 ZCode agent 只读浏览工作区，把相关背景喂给 AI
+          </label>
+          <div className="ws-row">
+            <span className="ws-label">工作区：</span>
+            <span className="ws-path">{workspace.path || "未选择"}</span>
+            {isElectron && (
+              <button
+                onClick={async () => {
+                  const r = await pickWorkspace();
+                  if (!r.canceled && r.path) setWorkspace((w) => ({ ...w, path: r.path }));
+                }}
+              >
+                选择文件夹…
+              </button>
+            )}
+          </div>
+          <div className="ws-note">
+            {isElectron
+              ? zcode === null
+                ? "正在检测本机 ZCode CLI…"
+                : zcode.found
+                  ? "✅ 已检测到本机 ZCode（使用你现有的 ZCode 登录/套餐）。注意：ZCode 的模型凭证需可用（如在 ZCode 中已登录）。"
+                  : "⚠ 未找到本机 ZCode，Agent 模式不可用。"
+              : "（网页开发模式下不可用，需桌面版）"}
+          </div>
+        </div>
+
         <div className="modal-foot">
           <button onClick={props.onCancel}>取消</button>
           <button
             className="primary"
-            onClick={() => props.onSave({ providers, activeProviderId: activeId })}
+            onClick={() => props.onSave({ providers, activeProviderId: activeId, workspace })}
           >
             保存
           </button>

@@ -176,5 +176,19 @@ button:disabled { opacity: 0.6; cursor: default; }
 
 .modal-foot { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
 
+/* ---- workspace / agent mode ---- */
+.workspace-box {
+  border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px 14px; margin-top: 14px; font-size: 13px;
+}
+.ws-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.ws-label { color: var(--muted); font-size: 12px; }
+.ws-path {
+  flex: 1; font-family: ui-monospace, monospace; font-size: 12px;
+  color: var(--ink); background: #f6f7f5; border-radius: 6px; padding: 5px 8px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ws-note { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
 /* BlockNote polish: keep the paper calm */
 .bn-container .bn-editor { padding-inline: 0; }

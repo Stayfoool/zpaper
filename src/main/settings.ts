@@ -14,6 +14,12 @@ export type ProviderConfig = {
 export type ZpaperSettings = {
   providers: ProviderConfig[];
   activeProviderId?: string;
+  workspace?: {
+    /** workspace folder the agent may read from */
+    path?: string;
+    /** let AI gather context from the workspace before editing */
+    enabled?: boolean;
+  };
 };
 
 const settingsPath = () => path.join(app.getPath("userData"), "settings.json");

@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, protocol } from "electron";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { handleChat, handleTest, loadSettings, saveSettings } from "./ai";
+import { handleChat, handleTest, loadSettings, saveSettings, detectZcodeCli } from "./ai";
 
 // this bundle is ESM, derive the classic dirname for locating the preload
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -22,6 +22,11 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 const DEV_URL = process.env.ELECTRON_RENDERER_URL;
+
+// CI/test smoke runs use an isolated userData so real user settings are untouched
+if (process.env.ZPAPER_SMOKE_USERDATA) {
+  app.setPath("userData", process.env.ZPAPER_SMOKE_USERDATA);
+}
 
 let win: BrowserWindow | null = null;
 
@@ -65,6 +70,20 @@ app.whenReady().then(async () => {
     return true;
   });
 
+  ipcMain.handle("zpaper:workspace:pick", async () => {
+    const r = await dialog.showOpenDialog(win!, {
+      title: "选择工作区文件夹（AI 将只读取该目录下的文件作为参考）",
+      properties: ["openDirectory"],
+    });
+    if (r.canceled || !r.filePaths[0]) return { canceled: true };
+    return { canceled: false, path: r.filePaths[0] };
+  });
+
+  ipcMain.handle("zpaper:zcode:status", () => {
+    const cli = detectZcodeCli();
+    return { found: !!cli, kind: cli?.kind ?? null };
+  });
+
   ipcMain.handle("zpaper:file:open", async () => {
     const r = await dialog.showOpenDialog(win!, {
       title: "打开文档",
@@ -96,34 +115,49 @@ app.whenReady().then(async () => {
 
   createWindow();
 
-  // CI smoke: exercise the ai:// protocol end to end with a deliberately
-  // invalid key — success means the pipeline ran and reached the provider API.
+  // CI smoke: exercise the full chat pipeline (agent research -> mock model)
+  // against the ai:// protocol from the main process.
   if (process.env.ZPAPER_SMOKE_AI === "1") {
     setTimeout(async () => {
       try {
+        const { net } = await import("electron");
         const doFetch = (async () => {
           const { net } = await import("electron");
-          return await net.fetch("ai://local/test", {
+          return await net.fetch("ai://local/chat", {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
-              id: "smoke",
-              name: "smoke",
-              protocol: "anthropic",
-              baseURL: "https://api.z.ai/api/anthropic",
-              apiKey: "invalid-smoke-key",
-              model: "GLM-5.2",
+              messages: [
+                { id: "m1", role: "user", parts: [{ type: "text", text: "请修改文档" }] },
+              ],
+              toolDefinitions: {
+                applyDocumentOperations: {
+                  description: "test",
+                  inputSchema: {
+                    type: "object",
+                    properties: { operations: { type: "array", items: { type: "object" } } },
+                  },
+                  outputSchema: { type: "object" },
+                },
+              },
             }),
           });
         })();
         const r = await Promise.race([
           doFetch,
-          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 6000)),
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 15000)),
         ]);
-        const j = await r.json();
-        console.log("[zpaper] smoke ai test result:", JSON.stringify(j).slice(0, 200));
+        const text = await r.text();
+        console.log(
+          "[zpaper] smoke chat result: status",
+          r.status,
+          "agent-header:",
+          r.headers.get("x-zpaper-agent"),
+          "stream bytes:",
+          text.length,
+        );
       } catch (e) {
-        console.error("[zpaper] smoke ai test:", String(e && (e as any).message || e).slice(0, 200));
+        console.error("[zpaper] smoke chat:", String(e && (e as any).message || e).slice(0, 200));
       }
     }, 3000);
   }

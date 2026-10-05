@@ -1,7 +1,7 @@
 {
   "name": "zpaper",
   "productName": "zpaper",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "zpaper — AI 帮你写文档的桌面编辑器：选区下达指令，AI 就地改写，修订式高亮，逐处接受/拒绝",
   "license": "GPL-3.0",
   "author": {

@@ -14,10 +14,13 @@ export type ProviderConfig = {
 export type Settings = {
   providers: ProviderConfig[];
   activeProviderId?: string;
+  workspace?: WorkspaceSettings;
 };
 
 const native = (window as any).zpaper;
 export const isElectron = !!native;
+
+export type WorkspaceSettings = { path?: string; enabled?: boolean };
 
 export async function getSettings(): Promise<Settings> {
   if (native) return (await native.getSettings()) as Settings;
@@ -64,4 +67,14 @@ export async function testProvider(p: ProviderConfig): Promise<{ ok: boolean; er
   } catch (e: any) {
     return { ok: false, error: String(e?.message || e) };
   }
+}
+
+export async function pickWorkspace(): Promise<{ canceled: boolean; path?: string }> {
+  if (native) return native.pickWorkspace();
+  return { canceled: true };
+}
+
+export async function zcodeStatus(): Promise<{ found: boolean; kind: string | null }> {
+  if (native) return native.zcodeStatus();
+  return { found: false, kind: null };
 }

@@ -3,7 +3,8 @@
 // Falls back to the built-in demo model when nothing is configured.
 import { resolveProviderModel, type ProviderConfig } from "./provider";
 import { buildMockModel } from "../shared/aimock";
-import { loadSettings } from "./settings";
+import { loadSettings, saveSettings } from "./settings";
+import { gatherWorkspaceContext, detectZcodeCli } from "./zcodeAgent";
 
 export { loadSettings, saveSettings } from "./settings";
 
@@ -38,14 +39,46 @@ export async function handleChat(req: Request): Promise<Response> {
       console.log(`[zpaper] AI: using provider "${label}"`);
     }
 
+    let system = aiDocumentFormats.html.systemPrompt;
+    let agentState = "off";
+
+    // agent mode: research the workspace with the local ZCode agent, then
+    // inject the digest into the editing request
+    const ws = loadSettings()?.workspace;
+    if (ws?.enabled && ws.path) {
+      if (!detectZcodeCli()) {
+        agentState = "no-cli";
+        console.warn("[zpaper] agent: ZCode CLI not found");
+      } else {
+        console.log("[zpaper] agent: gathering workspace context from", ws.path);
+        const r = await gatherWorkspaceContext({
+          workspacePath: ws.path,
+          instruction: lastUserText(messages) || "按要求修改文档",
+          docTitle: "当前文档",
+        });
+        if (r.ok && r.digest) {
+          agentState = "ok";
+          system +=
+            `\n\n【工作区参考资料（由 ZCode agent 从用户工作区收集）】\n${r.digest}\n` +
+            `请结合以上资料完成对文档的修改；资料与文档冲突时以文档为准。`;
+          console.log(`[zpaper] agent: context digest ${r.digest.length} chars in ${r.ms}ms`);
+        } else {
+          agentState = "fail";
+          console.warn("[zpaper] agent: research failed:", r.output.slice(0, 200));
+        }
+      }
+    }
+
     const result = streamText({
       model,
-      system: aiDocumentFormats.html.systemPrompt,
+      system,
       messages: await convertToModelMessages(injectDocumentStateMessages(messages)),
       tools: toolDefinitionsToToolSet(toolDefinitions),
       toolChoice: "required",
     });
-    return result.toUIMessageStreamResponse();
+    const response = result.toUIMessageStreamResponse();
+    response.headers.set("x-zpaper-agent", agentState);
+    return response;
   } catch (e) {
     console.error("[zpaper] /chat error:", e);
     return new Response(JSON.stringify({ error: String(e) }), { status: 500 });
@@ -79,3 +112,16 @@ function getActiveProvider(): ProviderConfig | null {
   if (!id) return null;
   return (settings.providers || []).find((p: any) => p.id === id) || null;
 }
+
+/** Best-effort extraction of the user's instruction text from UIMessages. */
+function lastUserText(messages: any): string {
+  try {
+    const s = JSON.stringify(messages);
+    const m = s.match(/"text":"([^"]{1,120})"/);
+    return m ? m[1] : "";
+  } catch {
+    return "";
+  }
+}
+
+export { detectZcodeCli };
