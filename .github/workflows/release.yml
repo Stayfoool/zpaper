@@ -16,8 +16,15 @@ jobs:
         include:
           - os: windows-latest
             args: --win
+            paths: |
+              release/*.exe
+              release/*.exe.blockmap
           - os: macos-latest
             args: --mac
+            paths: |
+              release/*.dmg
+              release/*.dmg.blockmap
+              release/latest-mac.yml
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -35,8 +42,34 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Package & publish
+      - name: Package
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npx electron-builder ${{ matrix.args }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+          path: ${{ matrix.paths }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create / update release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-        run: npx electron-builder ${{ matrix.args }} --publish always
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "zpaper $GITHUB_REF_NAME" \
+            --notes "下载对应平台安装包：Windows 用 *Setup*.exe，Apple Silicon 用 *arm64.dmg，Intel Mac 用 *arm64*.dmg 以外的 dmg。首次运行请参考 README 关于 SmartScreen/Gatekeeper 的说明。" \
+            || gh release view "$GITHUB_REF_NAME"
+          gh release upload "$GITHUB_REF_NAME" artifacts/* --clobber
+          gh release edit "$GITHUB_REF_NAME" --draft=false --latest=true
