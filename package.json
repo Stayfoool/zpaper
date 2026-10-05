@@ -1,0 +1,49 @@
+{
+  "name": "zpaper",
+  "productName": "zpaper",
+  "version": "0.1.0",
+  "description": "zpaper — AI 帮你写文档的桌面编辑器：选区下达指令，AI 就地改写，修订式高亮，逐处接受/拒绝",
+  "license": "GPL-3.0",
+  "author": {
+    "name": "zpaper contributors"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Stayfoool/zpaper.git"
+  },
+  "type": "module",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:renderer": "vite",
+    "build:renderer": "vite build",
+    "build:main": "node scripts/build-main.mjs",
+    "build": "pnpm build:renderer && pnpm build:main",
+    "start": "electron .",
+    "dist": "pnpm build && electron-builder",
+    "dist:dir": "pnpm build && electron-builder --dir"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "latest",
+    "@ai-sdk/openai": "latest",
+    "@blocknote/core": "0.55.0",
+    "@blocknote/mantine": "0.55.0",
+    "@blocknote/react": "0.55.0",
+    "@blocknote/xl-ai": "0.55.0",
+    "ai": "^7.0.127",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^6.0.0",
+    "concurrently": "^9.0.0",
+    "electron": "^41.0.0",
+    "electron-builder": "^26.0.0",
+    "esbuild": ">=0.25.0",
+    "typescript": "^5.6.0",
+    "vite": "^8.0.0"
+  },
+  "packageManager": "pnpm@10.34.6+sha512.7e1ae66a83a9143c118cc1944f37cc4f2b8acddeda4b001cfa78908f6e46e45e15292739ca6c9d026426cc757e9318cc98c5551d6a16c165097b0028ba87b4e6"
+}
