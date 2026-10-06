@@ -39,6 +39,8 @@
   },
   "devDependencies": {
     "@blocknote/server-util": "^0.55.0",
+    "@harbour-enterprises/superdoc": "^1.46.3",
+    "@superdoc-dev/sdk": "^1.21.3",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^6.0.0",

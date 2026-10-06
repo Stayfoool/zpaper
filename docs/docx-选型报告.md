@@ -1,6 +1,6 @@
 # zpaper docx 支持选型报告
 
-> 2026-10-06 · 立项评估 · 结论先行：**分两阶段走——阶段 A 用全 MIT 转换管线落地「打开/保存 docx」（已 PoC 验证，1-2 周）；阶段 B 跟踪 SuperDoc 评估原生修订（w:ins/w:del）；ONLYOFFICE 排除。**
+> 2026-10-06 · 立项评估 · 结论先行：**阶段 A（全 MIT 转换管线）已落地 v0.5.0；阶段 B SuperDoc PoC ✅ 验证通过（修订直写可行，见第 2B 节），可进入正式集成排期。**
 
 ## 1. 目标
 
@@ -23,13 +23,16 @@
 
 **工作量**：主进程接入（文件对话框扩展 .docx + 转换调用 + UI 提示）约 **1-2 周**。
 
-### 路线 B：SuperDoc（@harbour-enterprises/superdoc）——跟踪，二期评估
+### 路线 B：SuperDoc SDK——✅ PoC 验证通过（2026-10-06，`poc/superdoc-redline.mjs`）
 
-- 定位：浏览器/服务端两用的 docx 编辑器，ProseMirror 底座 + **OOXML 直接往返（不经 HTML）**，原生 track changes（redlines）、comments；提供 Document API / Node SDK / **MCP server**，明确面向 AI 场景
-- 现状核实（2026-10-06）：v1.46.3，**AGPL-3.0**（+商业双许可），GitHub 1082★，99 open issues，最近推送 2026-10-02（非常活跃）
-- 优势：高保真 + 原生修订写回，最贴合「AI 修改以 Word 修订呈现」的完全体
-- 顾虑：①AGPL 传染（本项目已定 GPL-3.0，**可组合**，无阻塞）；②项目年轻，API 稳定性未知；③与 BlockNote 是两套编辑器，若整体替换编辑器底座则 xl-ai 的 AI 交互要重新适配——**这是最大的架构成本**
-- **建议**：不替换编辑器。二期先评估「SuperDoc 仅作为 docx 的读写/修订服务」（文档级转换，编辑仍用 BlockNote）——PoC 其 `export`/`redlines` API 与 BlockNote html 的互转质量，2-3 天可出结论
+- **形态惊喜**：官方 `@superdoc-dev/sdk` 是「原生二进制宿主 + 客户端 API」（open / query.match / replace / save…），无需浏览器环境，与我们主进程 spawn ZCode CLI 的模式同构
+- **PoC 实测**：用我们管线生成合同 docx → SDK `open({ trackChanges: { replacements: "paired" }, userName: "zpaper AI" })` → `query.match` 定位「30 日」→ `doc.replace({ target, text: "45 日", changeMode: "tracked" })` → save → 解包验证：
+  - `<w:del w:author="zpaper AI"><w:delText>30</w:delText></w:del>` + `<w:ins w:author="zpaper AI"><w:t>45</w:t></w:ins>` **教科书级修订标记，作者/日期齐全**
+  - 替换粒度精准（只标删「30」，未动「日」）；find/replace/save 全链路 3 秒内
+  - 关键参数：`changeMode: "tracked"`（动作级开关，未开时为普通编辑——第一版 PoC 就栽在这）
+- **对接路径清晰**：AI 建议被接受后，把每处修改映射为 SDK 的 tracked replace（而不是整文件重写）， mammoth 打开腿保持不变。SDK 意图面极宽（表格/样式/批注/图片/节/目录共 300+ 操作），后续「修订直写」之外的增强空间大
+- **顾虑更新**：①AGPL 与本项目 GPL-3.0 兼容（已确认可行）；②SDK 拉平台原生二进制（各平台 optionalDependency，CI 三平台均可用）；③输出文件由 SuperDoc 重写打包（PoC 中 20KB→8KB，简单文档无损，复杂文档保真需正式集成时回归）；④注意 v0.5.0 转换页方案与之独立，两条腿并存
+- **正式集成工作量重估**：~1-2 周（原估 2-4 周，SDK 质量超预期）
 
 ### 路线 C：ONLYOFFICE Document Server——❌ 排除
 
@@ -39,8 +42,8 @@
 
 | 阶段 | 内容 | 许可 | 工作量 |
 |---|---|---|---|
-| **A（v0.3）** | 转换管线落地：打开/保存 .docx（内容结构级保真），设置里注明「复杂样式可能简化」；AI 修改保存为普通文本（非修订） | 全 MIT，与现栈零冲突 | 1-2 周 |
-| **B（v0.4+ 评估）** | SuperDoc 作为 docx 服务：AI 修改写回 Word 原生修订（redlines）；2-3 天 PoC 出结论后再排期 | AGPL（与本项目 GPL-3.0 兼容） | PoC 2-3 天；落地 2-4 周 |
+| **A（v0.5 ✅）** | 转换管线落地：打开/保存 .docx（内容结构级保真），设置里注明「复杂样式可能简化」；AI 修改保存为普通文本（非修订） | 全 MIT，与现栈零冲突 | 已上线 |
+| **B（v0.6，已验证可行）** | SuperDoc SDK 修订直写：docx 来源的文档，AI 修改被接受后经 SDK `changeMode:"tracked"` 写回 Word 原生修订（作者=zpaper AI）；正式集成前对复杂文档做一轮保真回归 | SuperDoc AGPL（与本项目 GPL-3.0 兼容） | 1-2 周 |
 
 ## 4. 风险与缓解
 
