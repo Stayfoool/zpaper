@@ -105,8 +105,11 @@ function getRoom(name) {
 
 function messageListener(room, conn) {
   return (data, isBinary) => {
-    if (isBinary) return;
+    // Yjs messages are binary frames — ws v8 passes them as Buffer here
     const message = new Uint8Array(data);
+    if (process.env.ZPAPER_COLLAB_DEBUG) {
+      console.log(`[collab:dbg] room=${room.name} msg ${message.length}B type=${message[0]}`);
+    }
     const decoder = decoding.createDecoder(message);
     const messageType = decoding.readVarUint(decoder);
     switch (messageType) {
