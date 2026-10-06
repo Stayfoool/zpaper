@@ -11,7 +11,7 @@ import {
 export const PRESETS: Omit<ProviderConfig, "id" | "apiKey">[] = [
   { name: "GLM Coding Plan（z.ai）", protocol: "openai", baseURL: "https://api.z.ai/api/coding/paas/v4", model: "GLM-5.2" },
   { name: "智谱 BigModel 开放平台", protocol: "openai", baseURL: "https://open.bigmodel.cn/api/paas/v4", model: "GLM-5.2" },
-  { name: "GLM（Anthropic 兼容）", protocol: "anthropic", baseURL: "https://api.z.ai/api/anthropic", model: "GLM-5.2" },
+  { name: "GLM（Anthropic 兼容）", protocol: "anthropic", baseURL: "https://api.z.ai/api/anthropic/v1", model: "GLM-5.2" },
   { name: "DeepSeek", protocol: "openai", baseURL: "https://api.deepseek.com", model: "deepseek-chat" },
   { name: "Kimi（Moonshot）", protocol: "openai", baseURL: "https://api.moonshot.cn/v1", model: "kimi-k2.5" },
   { name: "OpenAI", protocol: "openai", baseURL: "https://api.openai.com/v1", model: "gpt-4.1" },
