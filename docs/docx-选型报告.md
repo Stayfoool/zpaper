@@ -43,7 +43,7 @@
 | 阶段 | 内容 | 许可 | 工作量 |
 |---|---|---|---|
 | **A（v0.5 ✅）** | 转换管线落地：打开/保存 .docx（内容结构级保真），设置里注明「复杂样式可能简化」；AI 修改保存为普通文本（非修订） | 全 MIT，与现栈零冲突 | 已上线 |
-| **B（v0.6，已验证可行）** | SuperDoc SDK 修订直写：docx 来源的文档，AI 修改被接受后经 SDK `changeMode:"tracked"` 写回 Word 原生修订（作者=zpaper AI）；正式集成前对复杂文档做一轮保真回归 | SuperDoc AGPL（与本项目 GPL-3.0 兼容） | 1-2 周 |
+| **B（v0.6 ✅）** | SuperDoc SDK 修订直写：docx 来源的文档，保存时块级差分经 SDK `changeMode:"tracked"` 写回 Word 原生修订（作者 zpaper）；每次保存后基线重置为当前状态；失败自动降级普通保存 | SuperDoc AGPL（与本项目 GPL-3.0 兼容） | 已上线 |
 
 ## 4. 风险与缓解
 
