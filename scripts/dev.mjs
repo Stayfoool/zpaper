@@ -6,7 +6,7 @@ import { inlineJsdomStylesheet } from "./esbuild-plugins.mjs";
 
 await build({
   bundle: true,
-  external: ["electron"],
+  external: ["electron", "@superdoc-dev/sdk"],
   entryPoints: ["src/main/main.ts"],
   outfile: "dist/main/main.js",
   format: "esm",

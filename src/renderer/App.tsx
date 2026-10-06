@@ -39,6 +39,7 @@ import { SettingsModal, PRESETS } from "./SettingsModal";
 import { useAiChanges, lastInstruction } from "./useAiChanges";
 import { ChangesPanel } from "./ChangesPanel";
 import { CollabDialog, loadCollab, type CollabConfig } from "./CollabDialog";
+import { flattenBlocks } from "../shared/blockText";
 
 // capture the user's instruction from the outgoing AI request body
 const trackingFetch: typeof fetch = async (input, init) => {
@@ -65,6 +66,9 @@ export function App() {
   const collabCfg = useRef<CollabConfig | null>(loadCollab());
   const editorRef = useRef<BlockNoteEditor<any, any, any> | null>(null);
   const filePath = useRef<string | undefined>(undefined);
+  // snapshot of the blocks as they were when a .docx was opened — the baseline
+  // for writing accepted edits back as Word-native tracked changes
+  const originalDocx = useRef<{ path: string; blocks: ReturnType<typeof flattenBlocks> } | null>(null);
   const [fileName, setFileName] = useState(collabCfg.current ? `协作·${collabCfg.current.room}` : "欢迎");
   const [settings, setSettingsState] = useState<Settings>({ providers: [] });
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -165,13 +169,33 @@ export function App() {
       markdown: md,
       blocks: editorRef.current.document,
       path: filePath.current,
+      originalPath: originalDocx.current?.path,
+      originalBlocks: originalDocx.current?.blocks,
+      tracked: !!originalDocx.current,
     });
-    if (r.error) {
+    if (r.error && !r.fallbackSaved) {
       setStatus(r.error);
-    } else if (!r.canceled && r.path) {
+      return;
+    }
+    if (!r.canceled && r.path) {
       filePath.current = r.path;
       setFileName(r.name || "文档");
-      setStatus(isDocx(r.path) ? "已保存为 Word 文档" : `已保存到 ${r.path}`);
+      if (r.trackedChanges != null) {
+        setStatus(`已保存为 Word 文档（含 ${r.trackedChanges} 处修订标记）`);
+      } else if (r.fallbackSaved) {
+        setStatus(`已保存（普通方式）。${r.error || ""}`);
+      } else if (isDocx(r.path)) {
+        setStatus("已保存为 Word 文档");
+      } else {
+        setStatus(`已保存到 ${r.path}`);
+      }
+      // rebase the tracked-changes baseline on the just-saved file
+      if (isDocx(r.path) && editorRef.current) {
+        originalDocx.current = {
+          path: r.path,
+          blocks: flattenBlocks(editorRef.current.document as any),
+        };
+      }
     } else {
       setStatus("");
     }
@@ -189,7 +213,8 @@ export function App() {
       await editorRef.current.replaceBlocks(editorRef.current.document, r.blocks as any);
       filePath.current = r.path;
       setFileName(r.name || "文档");
-      setStatus("已打开 Word 文档（内容级保真，样式可能简化）");
+      originalDocx.current = { path: r.path!, blocks: flattenBlocks(r.blocks) };
+      setStatus("已打开 Word 文档（内容级保真，AI 修改可以修订形式写回）");
       return;
     }
     if (r.content != null) {
@@ -198,6 +223,7 @@ export function App() {
         await editorRef.current.replaceBlocks(editorRef.current.document, blocks);
         filePath.current = r.path;
         setFileName(r.name || "文档");
+        originalDocx.current = null;
         setStatus(`已打开 ${r.path}`);
       }
     }
@@ -209,6 +235,7 @@ export function App() {
     if (blocks) await editorRef.current.replaceBlocks(editorRef.current.document, blocks);
     filePath.current = undefined;
     setFileName("未命名");
+    originalDocx.current = null;
     setStatus("");
   }, []);
 

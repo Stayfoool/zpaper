@@ -6,6 +6,8 @@ files:
   - dist/**
   - package.json
 asar: true
+asarUnpack:
+  - node_modules/@superdoc-dev/sdk-*/**
 mac:
   category: public.app-category.productivity
   identity: null

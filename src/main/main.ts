@@ -4,6 +4,7 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { handleChat, handleTest, loadSettings, saveSettings, detectZcodeCli } from "./ai";
 import { openDocxFile, saveDocxFile, isDocxPath } from "./docx";
+import { saveDocxWithTrackedChanges, disposeDocxTrackClient } from "./docxTrack";
 
 // this bundle is ESM, derive the classic dirname for locating the preload
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -125,7 +126,17 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(
     "zpaper:file:save",
-    async (_e, payload: { markdown?: string; blocks?: any[]; path?: string }) => {
+    async (
+      _e,
+      payload: {
+        markdown?: string;
+        blocks?: any[];
+        path?: string;
+        originalPath?: string;
+        originalBlocks?: any[];
+        tracked?: boolean;
+      },
+    ) => {
       let p = payload.path;
       if (!p) {
         const r = await dialog.showSaveDialog(win!, {
@@ -143,6 +154,39 @@ app.whenReady().then(async () => {
         if (isDocxPath(p)) {
           if (!payload.blocks?.length) {
             return { canceled: false, error: "没有可保存的内容" };
+          }
+          // Phase B: when the document came from a .docx, prefer writing the
+          // user's accepted edits back as Word-native tracked changes.
+          // Fall back to the plain (final-text) save on any failure.
+          if (
+            payload.tracked &&
+            payload.originalPath &&
+            payload.originalBlocks?.length
+          ) {
+            try {
+              const r = await saveDocxWithTrackedChanges({
+                originalPath: payload.originalPath,
+                outPath: p,
+                originalBlocks: payload.originalBlocks,
+                currentBlocks: payload.blocks,
+                authorName: "zpaper",
+              });
+              return {
+                canceled: false,
+                path: p,
+                name: path.basename(p),
+                trackedChanges: r.applied,
+              };
+            } catch (e) {
+              console.warn("[zpaper] tracked save failed, falling back to plain:", String(e).slice(0, 200));
+              return {
+                canceled: false,
+                error: `修订保存失败，已回退为普通保存：${String((e as any)?.message || e).slice(0, 120)}`,
+                fallbackSaved: true,
+                path: p,
+                name: path.basename(p),
+              };
+            }
           }
           await saveDocxFile(p, payload.blocks);
         } else {
@@ -204,11 +248,14 @@ app.whenReady().then(async () => {
     }, 3000);
   }
 
-  // CI smoke: verify the docx conversion pipeline inside the bundled app
+  // CI smoke: verify the docx pipeline inside the bundled app, including the
+  // Phase B tracked-changes (redline) path which spawns the SuperDoc host.
   if (process.env.ZPAPER_SMOKE_DOCX === "1") {
     setTimeout(async () => {
       try {
-        const { docxBufferToBlocks, blocksToDocxBuffer } = await import("./docx");
+        const fsMod = await import("node:fs");
+        const { blocksToDocxBuffer, docxBufferToBlocks } = await import("./docx");
+        const { saveDocxWithTrackedChanges } = await import("./docxTrack");
         const sample = [
           { type: "heading", props: { level: 1 }, content: "烟测标题" },
           { type: "paragraph", content: [{ type: "text", text: "正文段落，包含", styles: {} }, { type: "text", text: "加粗", styles: { bold: true } }, { type: "text", text: "文字。", styles: {} }] },
@@ -219,10 +266,37 @@ app.whenReady().then(async () => {
         console.log(
           `[zpaper] smoke docx: bytes=${buf.length} blocks=${parsed.length} boldKept=${text.includes("bold")}`,
         );
+        // tracked roundtrip: original blocks vs edited blocks -> w:ins/w:del
+        const tmp = "/tmp/zpaper-smoke-tracked.docx";
+        fsMod.writeFileSync(tmp, buf);
+        const original = [
+          { id: "a", type: "heading", text: "烟测标题" },
+          { id: "b", type: "paragraph", text: "正文段落，包含加粗文字。" },
+        ];
+        const current = [
+          { id: "a", type: "heading", text: "烟测标题（已修订）" },
+          { id: "b", type: "paragraph", text: "正文段落，包含加粗文字。新增句子。" },
+        ];
+        const r = await saveDocxWithTrackedChanges({
+          originalPath: tmp,
+          outPath: tmp.replace(".docx", "-tracked.docx"),
+          originalBlocks: original,
+          currentBlocks: current,
+          authorName: "zpaper",
+        });
+        const xml = execSyncTracked(tmp.replace(".docx", "-tracked.docx"));
+        console.log(
+          `[zpaper] smoke redline: applied=${r.applied} w:ins=${xml.includes("<w:ins ")} w:del=${xml.includes("<w:del ")}`,
+        );
       } catch (e) {
-        console.error("[zpaper] smoke docx failed:", String(e).slice(0, 200));
+        console.error("[zpaper] smoke docx failed:", String(e).slice(0, 300));
       }
     }, 2000);
+  }
+
+  function execSyncTracked(p: string): string {
+    const { execSync } = require("node:child_process");
+    return execSync(`unzip -p ${JSON.stringify(p)} word/document.xml`).toString();
   }
 
   app.on("activate", () => {
@@ -232,6 +306,10 @@ app.whenReady().then(async () => {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
+});
+
+void app.on("will-quit", () => {
+  void disposeDocxTrackClient();
 });
 
 // CI smoke test hook: quit shortly after launch so packaging pipelines can

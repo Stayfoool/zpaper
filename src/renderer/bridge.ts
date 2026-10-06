@@ -51,9 +51,23 @@ export async function openFile(): Promise<OpenedFile> {
   return { canceled: false, path: "welcome.md", name: "欢迎.md", kind: "markdown", content: WELCOME_MD };
 }
 
-export async function saveFile(
-  payload: { markdown: string; blocks: any[]; path?: string },
-): Promise<OpenedFile> {
+export type SaveResult = {
+  canceled: boolean;
+  path?: string;
+  name?: string;
+  error?: string;
+  trackedChanges?: number;
+  fallbackSaved?: boolean;
+};
+
+export async function saveFile(payload: {
+  markdown: string;
+  blocks: any[];
+  path?: string;
+  originalPath?: string;
+  originalBlocks?: any[];
+  tracked?: boolean;
+}): Promise<SaveResult> {
   if (native) return native.saveFile(payload);
   const blob = new Blob([payload.markdown], { type: "text/markdown" });
   const a = document.createElement("a");

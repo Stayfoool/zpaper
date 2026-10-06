@@ -4,7 +4,9 @@ import { inlineJsdomStylesheet } from "./esbuild-plugins.mjs";
 
 const common = {
   bundle: true,
-  external: ["electron"],
+  // keep the SuperDoc SDK external: at runtime it require.resolve()s its
+  // platform host binary from node_modules (must stay on disk, not inlined)
+  external: ["electron", "@superdoc-dev/sdk"],
   sourcemap: false,
   logLevel: "info",
   plugins: [inlineJsdomStylesheet()],

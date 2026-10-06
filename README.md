@@ -97,7 +97,7 @@ Electron + React + [BlockNote](https://blocknotejs.org)（`xl-ai` AI 编辑扩�
 - [x] **Agent 模式**（v0.3，实验性）：修改前由本机 ZCode agent 只读浏览工作区，AI 基于项目背景改文档
 - [x] **多人协作**（v0.4，实验性）：Yjs CRDT + 自托管小服务器，多人实时共编 + 远程光标 + AI 修改接受后同步
 - [x] **docx 打开/保存**（v0.5）：直接打开/保存 .docx（内容结构级保真：标题/加粗/列表/表格；视觉样式会简化）。选型报告见 [docs/docx-选型报告.md](docs/docx-选型报告.md)
-- [ ] docx 修订直写（AI 修改以 Word 修订标记保存，阶段 B 评估 SuperDoc）
+- [x] **docx 修订直写**（v0.6）：docx 来源的文档保存时，接受的修改以 Word 原生修订（w:ins/w:del，作者 zpaper）写回——Word/WPS 里可逐条审阅；阶段 B 选型结论见 [docs/docx-选型报告.md](docs/docx-选型报告.md)
 - [x] **多人协作**（v0.4，实验性）：Yjs CRDT + 自托管小服务器，多人实时共编 + 远程光标 + AI 修改接受后同步
 - [ ] 自定义 AI 菜单指令（中文快捷指令）
 - [ ] 应用图标与代码签名

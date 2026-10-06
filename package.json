@@ -1,7 +1,7 @@
 {
   "name": "zpaper",
   "productName": "zpaper",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "zpaper — AI 帮你写文档的桌面编辑器：选区下达指令，AI 就地改写，修订式高亮，逐处接受/拒绝",
   "license": "GPL-3.0",
   "author": {
@@ -31,6 +31,7 @@
     "@blocknote/mantine": "0.55.0",
     "@blocknote/react": "0.55.0",
     "@blocknote/xl-ai": "0.55.0",
+    "@superdoc-dev/sdk": "^1.21.3",
     "ai": "^7.0.127",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -40,7 +41,6 @@
   "devDependencies": {
     "@blocknote/server-util": "^0.55.0",
     "@harbour-enterprises/superdoc": "^1.46.3",
-    "@superdoc-dev/sdk": "^1.21.3",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^6.0.0",
