@@ -1,11 +1,13 @@
 // Bundle the Electron main process and preload with esbuild.
 import esbuild from "esbuild";
+import { inlineJsdomStylesheet } from "./esbuild-plugins.mjs";
 
 const common = {
   bundle: true,
   external: ["electron"],
   sourcemap: false,
   logLevel: "info",
+  plugins: [inlineJsdomStylesheet()],
 };
 
 await esbuild.build({
@@ -15,9 +17,16 @@ await esbuild.build({
   format: "esm",
   platform: "node",
   target: "node20",
-  // ESM output shims CJS deps (node builtins required by AI SDK packages)
+  // ESM output shims CJS deps (node builtins + __dirname used by AI SDK / mammoth)
   banner: {
-    js: `import { createRequire as __createRequire } from "node:module";\nconst require = __createRequire(import.meta.url);`,
+    js: [
+      `import { createRequire as __createRequire } from "node:module";`,
+      `import { fileURLToPath as __fltp } from "node:url";`,
+      `import { dirname as __dirname_fn } from "node:path";`,
+      `const require = __createRequire(import.meta.url);`,
+      `const __filename = __fltp(import.meta.url);`,
+      `const __dirname = __dirname_fn(__filename);`,
+    ].join("\n"),
   },
 });
 

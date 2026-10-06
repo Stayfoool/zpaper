@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { handleChat, handleTest, loadSettings, saveSettings, detectZcodeCli } from "./ai";
+import { openDocxFile, saveDocxFile, isDocxPath } from "./docx";
 
 // this bundle is ESM, derive the classic dirname for locating the preload
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -88,30 +89,71 @@ app.whenReady().then(async () => {
     const r = await dialog.showOpenDialog(win!, {
       title: "打开文档",
       filters: [
+        { name: "所有支持的文档", extensions: ["md", "markdown", "txt", "docx"] },
         { name: "Markdown / 文本", extensions: ["md", "markdown", "txt"] },
-        { name: "所有文件", extensions: ["*"] },
+        { name: "Word 文档", extensions: ["docx"] },
       ],
       properties: ["openFile"],
     });
     if (r.canceled || !r.filePaths[0]) return { canceled: true };
     const p = r.filePaths[0];
-    return { canceled: false, path: p, name: path.basename(p), content: fs.readFileSync(p, "utf8") };
+    if (isDocxPath(p)) {
+      try {
+        const blocks = await openDocxFile(p);
+        return {
+          canceled: false,
+          path: p,
+          name: path.basename(p),
+          kind: "blocks",
+          blocks,
+        };
+      } catch (e: any) {
+        return {
+          canceled: false,
+          error: `Word 文档打开失败：${String(e?.message || e).slice(0, 160)}`,
+        };
+      }
+    }
+    return {
+      canceled: false,
+      path: p,
+      name: path.basename(p),
+      kind: "markdown",
+      content: fs.readFileSync(p, "utf8"),
+    };
   });
 
-  ipcMain.handle("zpaper:file:save", async (_e, payload: { content: string; path?: string }) => {
-    let p = payload.path;
-    if (!p) {
-      const r = await dialog.showSaveDialog(win!, {
-        title: "保存文档",
-        defaultPath: "未命名.md",
-        filters: [{ name: "Markdown", extensions: ["md"] }],
-      });
-      if (r.canceled || !r.filePath) return { canceled: true };
-      p = r.filePath;
-    }
-    fs.writeFileSync(p, payload.content, "utf8");
-    return { canceled: false, path: p, name: path.basename(p) };
-  });
+  ipcMain.handle(
+    "zpaper:file:save",
+    async (_e, payload: { markdown?: string; blocks?: any[]; path?: string }) => {
+      let p = payload.path;
+      if (!p) {
+        const r = await dialog.showSaveDialog(win!, {
+          title: "保存文档",
+          defaultPath: "未命名.md",
+          filters: [
+            { name: "Word 文档", extensions: ["docx"] },
+            { name: "Markdown", extensions: ["md"] },
+          ],
+        });
+        if (r.canceled || !r.filePath) return { canceled: true };
+        p = r.filePath;
+      }
+      try {
+        if (isDocxPath(p)) {
+          if (!payload.blocks?.length) {
+            return { canceled: false, error: "没有可保存的内容" };
+          }
+          await saveDocxFile(p, payload.blocks);
+        } else {
+          fs.writeFileSync(p, payload.markdown ?? "", "utf8");
+        }
+        return { canceled: false, path: p, name: path.basename(p) };
+      } catch (e: any) {
+        return { canceled: false, error: `保存失败：${String(e?.message || e).slice(0, 160)}` };
+      }
+    },
+  );
 
   createWindow();
 
@@ -160,6 +202,27 @@ app.whenReady().then(async () => {
         console.error("[zpaper] smoke chat:", String(e && (e as any).message || e).slice(0, 200));
       }
     }, 3000);
+  }
+
+  // CI smoke: verify the docx conversion pipeline inside the bundled app
+  if (process.env.ZPAPER_SMOKE_DOCX === "1") {
+    setTimeout(async () => {
+      try {
+        const { docxBufferToBlocks, blocksToDocxBuffer } = await import("./docx");
+        const sample = [
+          { type: "heading", props: { level: 1 }, content: "烟测标题" },
+          { type: "paragraph", content: [{ type: "text", text: "正文段落，包含", styles: {} }, { type: "text", text: "加粗", styles: { bold: true } }, { type: "text", text: "文字。", styles: {} }] },
+        ];
+        const buf = await blocksToDocxBuffer(sample as any);
+        const parsed = await docxBufferToBlocks(buf);
+        const text = JSON.stringify(parsed);
+        console.log(
+          `[zpaper] smoke docx: bytes=${buf.length} blocks=${parsed.length} boldKept=${text.includes("bold")}`,
+        );
+      } catch (e) {
+        console.error("[zpaper] smoke docx failed:", String(e).slice(0, 200));
+      }
+    }, 2000);
   }
 
   app.on("activate", () => {

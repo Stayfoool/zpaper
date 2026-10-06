@@ -36,21 +36,31 @@ export async function setSettings(s: Settings) {
   localStorage.setItem("zpaper:settings", JSON.stringify(s));
 }
 
-export type OpenedFile = { canceled: boolean; path?: string; name?: string; content?: string };
+export type OpenedFile = {
+  canceled: boolean;
+  path?: string;
+  name?: string;
+  content?: string;
+  kind?: "markdown" | "blocks";
+  blocks?: any[];
+  error?: string;
+};
 
 export async function openFile(): Promise<OpenedFile> {
   if (native) return native.openFile();
-  return { canceled: false, path: "welcome.md", name: "欢迎.md", content: WELCOME_MD };
+  return { canceled: false, path: "welcome.md", name: "欢迎.md", kind: "markdown", content: WELCOME_MD };
 }
 
-export async function saveFile(content: string, path?: string): Promise<OpenedFile> {
-  if (native) return native.saveFile({ content, path });
-  const blob = new Blob([content], { type: "text/markdown" });
+export async function saveFile(
+  payload: { markdown: string; blocks: any[]; path?: string },
+): Promise<OpenedFile> {
+  if (native) return native.saveFile(payload);
+  const blob = new Blob([payload.markdown], { type: "text/markdown" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = path || "文档.md";
+  a.download = payload.path || "文档.md";
   a.click();
-  return { canceled: false, path: path || "downloaded.md", name: "文档.md" };
+  return { canceled: false, path: payload.path || "downloaded.md", name: "文档.md" };
 }
 
 export const CHAT_API = isElectron ? "ai://local/chat" : "/api/chat";

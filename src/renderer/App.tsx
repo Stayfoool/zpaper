@@ -59,6 +59,8 @@ const trackingFetch: typeof fetch = async (input, init) => {
   return fetch(input, init);
 };
 
+const isDocx = (p: string) => /\.docx$/i.test(p);
+
 export function App() {
   const collabCfg = useRef<CollabConfig | null>(loadCollab());
   const editorRef = useRef<BlockNoteEditor<any, any, any> | null>(null);
@@ -159,11 +161,17 @@ export function App() {
     if (!editorRef.current) return;
     setStatus("保存中…");
     const md = await editorRef.current.blocksToMarkdownLossy(editorRef.current.document);
-    const r = await saveFile(md, filePath.current);
-    if (!r.canceled && r.path) {
+    const r = await saveFile({
+      markdown: md,
+      blocks: editorRef.current.document,
+      path: filePath.current,
+    });
+    if (r.error) {
+      setStatus(r.error);
+    } else if (!r.canceled && r.path) {
       filePath.current = r.path;
       setFileName(r.name || "文档");
-      setStatus(`已保存到 ${r.path}`);
+      setStatus(isDocx(r.path) ? "已保存为 Word 文档" : `已保存到 ${r.path}`);
     } else {
       setStatus("");
     }
@@ -172,13 +180,26 @@ export function App() {
   const onOpen = useCallback(async () => {
     if (!editorRef.current) return;
     const r = await openFile();
-    if (r.canceled || r.content == null) return;
-    const blocks = await editorRef.current.tryParseMarkdownToBlocks(r.content);
-    if (blocks) {
-      await editorRef.current.replaceBlocks(editorRef.current.document, blocks);
+    if (r.canceled) return;
+    if (r.error) {
+      setStatus(r.error);
+      return;
+    }
+    if (r.kind === "blocks" && r.blocks) {
+      await editorRef.current.replaceBlocks(editorRef.current.document, r.blocks as any);
       filePath.current = r.path;
       setFileName(r.name || "文档");
-      setStatus(`已打开 ${r.path}`);
+      setStatus("已打开 Word 文档（内容级保真，样式可能简化）");
+      return;
+    }
+    if (r.content != null) {
+      const blocks = await editorRef.current.tryParseMarkdownToBlocks(r.content);
+      if (blocks) {
+        await editorRef.current.replaceBlocks(editorRef.current.document, blocks);
+        filePath.current = r.path;
+        setFileName(r.name || "文档");
+        setStatus(`已打开 ${r.path}`);
+      }
     }
   }, []);
 

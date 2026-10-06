@@ -2,6 +2,7 @@
 // Electron pointed at it. Main/preload are rebuilt once up front.
 import { spawn } from "node:child_process";
 import { build } from "esbuild";
+import { inlineJsdomStylesheet } from "./esbuild-plugins.mjs";
 
 await build({
   bundle: true,
@@ -12,8 +13,16 @@ await build({
   platform: "node",
   target: "node20",
   logLevel: "warning",
+  plugins: [inlineJsdomStylesheet()],
   banner: {
-    js: `import { createRequire as __createRequire } from "node:module";\nconst require = __createRequire(import.meta.url);`,
+    js: [
+      `import { createRequire as __createRequire } from "node:module";`,
+      `import { fileURLToPath as __fltp } from "node:url";`,
+      `import { dirname as __dirname_fn } from "node:path";`,
+      `const require = __createRequire(import.meta.url);`,
+      `const __filename = __fltp(import.meta.url);`,
+      `const __dirname = __dirname_fn(__filename);`,
+    ].join("\n"),
   },
 });
 await build({
