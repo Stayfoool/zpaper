@@ -17,6 +17,14 @@ import {
 } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 import { AIMenuController, AIToolbarButton, getAISlashMenuItems } from "@blocknote/xl-ai";
+import {
+  ClearFormattingButton,
+  FontFamilySelect,
+  FontSizeSelect,
+  JustifyAlignButton,
+  SubscriptButton,
+  SuperscriptButton,
+} from "@/docEdit/toolbarExtras.js";
 
 export function DocEditSurface({
   editor,
@@ -40,18 +48,24 @@ export function DocEditSurface({
         formattingToolbar={() => (
           <FormattingToolbar>
             <BlockTypeSelect />
+            <FontFamilySelect />
+            <FontSizeSelect />
             <BasicTextStyleButton basicTextStyle="bold" />
             <BasicTextStyleButton basicTextStyle="italic" />
             <BasicTextStyleButton basicTextStyle="underline" />
             <BasicTextStyleButton basicTextStyle="strike" />
             <BasicTextStyleButton basicTextStyle="code" />
+            <SubscriptButton />
+            <SuperscriptButton />
             <TextAlignButton textAlignment="left" />
             <TextAlignButton textAlignment="center" />
             <TextAlignButton textAlignment="right" />
+            <JustifyAlignButton />
             <ColorStyleButton />
             <NestBlockButton />
             <UnnestBlockButton />
             <CreateLinkButton />
+            <ClearFormattingButton />
             <AIToolbarButton />
           </FormattingToolbar>
         )}

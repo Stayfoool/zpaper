@@ -11,12 +11,14 @@ import { en, zh } from "@blocknote/core/locales";
 import type { ChatTransport, UIMessage } from "ai";
 import { useCreateBlockNote } from "@blocknote/react";
 import { AIExtension } from "@blocknote/xl-ai";
+import { en as aiEn, zh as aiZh } from "@blocknote/xl-ai/locales";
 import * as mammoth from "mammoth";
 import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
 import "@blocknote/xl-ai/style.css";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { createDemoDocEditTransport } from "@/docEdit/docEditMockTransport.js";
+import { docEditSchema } from "@/docEdit/docEditSchema.js";
 import { DocEditSurface } from "@/docEdit/docEditSurface.js";
 
 const MAX_DOCX_BYTES = 50 * 1024 * 1024;
@@ -61,7 +63,12 @@ export function DocxDocEditContent({
   const editorRef = useRef<BlockNoteEditor<any, any, any> | null>(null);
 
   const editor = useCreateBlockNote({
-    dictionary: locale.startsWith("zh") ? zh : en,
+    schema: docEditSchema,
+    // xl-ai 词典并入 editor dictionary，否则 AI 菜单报 "AI dictionary not found"
+    dictionary: {
+      ...(locale.startsWith("zh") ? zh : en),
+      ai: locale.startsWith("zh") ? aiZh : aiEn,
+    },
     extensions: [
       AIExtension({
         agentCursor: { name: "AI", color: "#4f8ef7" },
