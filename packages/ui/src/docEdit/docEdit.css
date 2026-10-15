@@ -1,0 +1,20 @@
+/* 文档编辑 pane 的 BlockNote 样式补充。
+   编辑 pane 比主编辑区窄：格式工具栏 20 个控件单行放不下，会被面板
+   右边缘截断（AI/颜色/链接等控件不可见）。这里允许换行并限制在面板
+   宽度内。工具栏由 FloatingUI portal 到 BlockNoteView 内部，因此以
+   .zp-doc-edit 根容器作作用域即可。 */
+
+.zp-doc-edit .bn-formatting-toolbar {
+  flex-wrap: wrap;
+  max-width: 100%;
+  row-gap: 2px;
+}
+
+.zp-doc-edit .bn-formatting-toolbar > * {
+  flex-shrink: 0;
+}
+
+/* AI 菜单/输入框同样可能超出窄面板 */
+.zp-doc-edit .bn-ai-menu {
+  max-width: 100%;
+}

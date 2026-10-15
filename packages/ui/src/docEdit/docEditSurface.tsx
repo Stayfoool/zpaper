@@ -25,6 +25,7 @@ import {
   SubscriptButton,
   SuperscriptButton,
 } from "@/docEdit/toolbarExtras.js";
+import "@/docEdit/docEdit.css";
 
 export function DocEditSurface({
   editor,
@@ -36,7 +37,8 @@ export function DocEditSurface({
   onChange?: () => void;
 }) {
   return (
-    <BlockNoteView
+    <div className="zp-doc-edit">
+      <BlockNoteView
       editor={editor}
       theme={dark ? "dark" : "light"}
       formattingToolbar={false}
@@ -79,6 +81,7 @@ export function DocEditSurface({
           ).concat(filterSuggestionItems(getAISlashMenuItems(editor), query))
         }
       />
-    </BlockNoteView>
+      </BlockNoteView>
+    </div>
   );
 }
