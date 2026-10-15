@@ -1,0 +1,2 @@
+patchedDependencies:
+  '@blocknote/xl-ai@0.55.0': patches/@blocknote__xl-ai@0.55.0.patch
