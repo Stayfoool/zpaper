@@ -1,7 +1,7 @@
 {
   "name": "zpaper",
   "productName": "zpaper",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "zpaper — 和 AI 一起深读、一起创作的文档：把 ZCode 与 Word 编辑器融合在了一起；选区即指令，就地修改，痕迹可见",
   "license": "GPL-3.0",
   "author": {
