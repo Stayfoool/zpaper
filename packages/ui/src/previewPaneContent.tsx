@@ -1,7 +1,7 @@
 import type { MarkdownSelectionTarget } from "@/lib/conversationSelectionReference.js";
 /* eslint-disable max-lines -- PreviewPane 内容路由同时承载文本、图片、媒体、Office、PDF 和 PPTX 渲染。 */
 import type { BundledTheme } from "shiki";
-import { useMemo, type Ref, type SyntheticEvent, type UIEventHandler } from "react";
+import { useMemo, type ComponentProps, type Ref, type SyntheticEvent, type UIEventHandler } from "react";
 import type { FileBinaryPreview, FileMediaPreview, FileTextSlice } from "@zcode/shared";
 import { inferCodeLanguage } from "@/lib/codeViewer.js";
 import type { CodeViewerSource } from "@/lib/codeViewer.js";
@@ -10,6 +10,7 @@ import type { CodePreviewSettings } from "@/store/index.js";
 import type { CodeCommentLabels } from "@/components/ui/code-viewer.js";
 import { MarkdownPreviewContent } from "@/previewPaneMarkdownContent.js";
 import { MarkdownDocEditContent } from "@/docEdit/markdownDocEditContent.js";
+import { DocxDocEditContent } from "@/docEdit/docxDocEditContent.js";
 import { CodeContent } from "@/previewPaneCodeContent.js";
 import { ImagePreviewContent, SvgPreviewContent } from "@/previewPaneImageContent.js";
 import { PreviewPaneMediaContent } from "@/previewPaneMediaContent.js";
@@ -63,6 +64,12 @@ interface PreviewPaneContentProps {
   markdownViewMode: "preview" | "code" | "edit";
   /** 文档编辑 pane 保存回调（仅 edit 模式使用），由 PreviewPane 经 FileService 落盘 */
   onMarkdownPersist?: (markdown: string) => Promise<void>;
+  /** docx 编辑 pane：读取整文件字节（FileService.readFileRange 封装） */
+  onDocxReadBytes?: (path: string) => Promise<Uint8Array>;
+  /** docx 编辑 pane 保存：HTML 经 host 侧 html-to-docx 组装 .docx 落盘 */
+  onDocxPersist?: (html: string) => Promise<void>;
+  /** 文档编辑 pane 的 AI transport（真实模型通道），缺省回退演示 transport */
+  docEditTransport?: ComponentProps<typeof MarkdownDocEditContent>["aiTransport"];
   svgViewMode: "preview" | "code";
   wrapLongLines: boolean;
   codeComments: readonly CodeCommentPreview[];
@@ -124,6 +131,9 @@ export function PreviewPaneContent({
   markdownSelectionTarget,
   markdownViewMode,
   onMarkdownPersist,
+  onDocxReadBytes,
+  onDocxPersist,
+  docEditTransport,
   svgViewMode,
   wrapLongLines,
   codeComments,
@@ -206,6 +216,7 @@ export function PreviewPaneContent({
           sourceKey={source.path}
           dark={resolvedTheme === "dark"}
           onPersist={onMarkdownPersist}
+          {...(docEditTransport ? { aiTransport: docEditTransport } : {})}
         />
       );
     }
@@ -322,6 +333,17 @@ export function PreviewPaneContent({
     return <PdfPreviewContent source={pdfViewerSource} labels={pdfViewerLabels} />;
   }
 
+  if (source.type === "file" && officePreviewKind === "docx" && markdownViewMode === "edit" && source.path && onDocxReadBytes && onDocxPersist) {
+    return (
+      <DocxDocEditContent
+        sourcePath={source.path}
+        dark={resolvedTheme === "dark"}
+        readBytes={onDocxReadBytes}
+        onPersist={onDocxPersist}
+        {...(docEditTransport ? { aiTransport: docEditTransport } : {})}
+      />
+    );
+  }
   if (source.type === "file" && officePreviewKind) {
     return (
       <PreviewPaneOfficeContent
@@ -431,6 +453,7 @@ export function PreviewPaneContent({
         sourceKey={source.path}
         dark={resolvedTheme === "dark"}
         onPersist={onMarkdownPersist}
+        {...(docEditTransport ? { aiTransport: docEditTransport } : {})}
       />
     );
   }

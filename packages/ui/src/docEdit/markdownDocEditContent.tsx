@@ -1,38 +1,20 @@
 // 文档编辑 pane（一期 MVP，见《智能文档编辑-调研与方案》阶段 1）：
 // markdown 预览 pane 的可编辑形态 —— BlockNote 富文本编辑器 + xl-ai 的
-// 「选中 → AI 编辑 → 审查态」交互（当前接演示 transport，真实模型通道
-// 接入后替换 AIExtension 的 transport 即可）。保存经 onPersist 走
+// 「选中 → AI 编辑 → 审查态」。AI transport 由 PreviewPane 注入（真实模型
+// 通道），未注入时回退演示 transport。保存经 onPersist 走
 // FileService.writeTextFile 落盘。
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BlockNoteEditor } from "@blocknote/core";
 import { en, zh } from "@blocknote/core/locales";
-import { filterSuggestionItems } from "@blocknote/core/extensions";
-import {
-  BasicTextStyleButton,
-  BlockTypeSelect,
-  ColorStyleButton,
-  CreateLinkButton,
-  FormattingToolbar,
-  FormattingToolbarController,
-  getDefaultReactSlashMenuItems,
-  NestBlockButton,
-  SuggestionMenuController,
-  TextAlignButton,
-  UnnestBlockButton,
-  useCreateBlockNote,
-} from "@blocknote/react";
-import { BlockNoteView } from "@blocknote/mantine";
-import {
-  AIExtension,
-  AIMenuController,
-  AIToolbarButton,
-  getAISlashMenuItems,
-} from "@blocknote/xl-ai";
+import type { ChatTransport, UIMessage } from "ai";
+import { useCreateBlockNote } from "@blocknote/react";
+import { AIExtension } from "@blocknote/xl-ai";
 import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
 import "@blocknote/xl-ai/style.css";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { createDemoDocEditTransport } from "@/docEdit/docEditMockTransport.js";
+import { DocEditSurface } from "@/docEdit/docEditSurface.js";
 
 interface MarkdownDocEditContentProps {
   /** 打开时的文件内容（markdown 源文本） */
@@ -42,6 +24,11 @@ interface MarkdownDocEditContentProps {
   dark: boolean;
   /** 保存：父级经 FileService.writeTextFile 落盘；抛错即保存失败 */
   onPersist: (markdown: string) => Promise<void>;
+  /**
+   * 真实模型 transport（经 ZCode agent runtime / 账号层）。
+   * 缺省时回退到演示 transport（无 key 也能演示交互）。
+   */
+  aiTransport?: ChatTransport<UIMessage>;
 }
 
 type SaveState = { kind: "idle" } | { kind: "dirty" } | { kind: "saving" } | { kind: "saved" } | { kind: "error"; message: string };
@@ -51,6 +38,7 @@ export function MarkdownDocEditContent({
   sourceKey,
   dark,
   onPersist,
+  aiTransport,
 }: MarkdownDocEditContentProps) {
   const { intl, locale } = useZCodeIntl();
   const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
@@ -63,8 +51,7 @@ export function MarkdownDocEditContent({
     extensions: [
       AIExtension({
         agentCursor: { name: "AI", color: "#4f8ef7" },
-        // TODO(阶段 1b)：接入 ZCode 模型通道（BYO token / 账号层），替换演示 transport
-        transport: createDemoDocEditTransport() as never,
+        transport: (aiTransport ?? createDemoDocEditTransport()) as never,
       }),
     ],
     initialContent: [{ type: "paragraph", content: "" }],
@@ -91,18 +78,14 @@ export function MarkdownDocEditContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- content/sourceKey 仅在载入时消费
   }, [editor, sourceKey]);
 
-  const toMarkdown = useCallback(async () => {
-    const ed = editorRef.current;
-    if (!ed) throw new Error("editor unavailable");
-    return ed.blocksToMarkdownLossy(ed.document);
-  }, []);
-
   const save = useCallback(async () => {
     if (savingRef.current) return;
     savingRef.current = true;
     setSaveState({ kind: "saving" });
     try {
-      await onPersist(await toMarkdown());
+      const ed = editorRef.current;
+      if (!ed) throw new Error("editor unavailable");
+      await onPersist(await ed.blocksToMarkdownLossy(ed.document));
       setSaveState({ kind: "saved" });
     } catch (error) {
       setSaveState({
@@ -112,7 +95,7 @@ export function MarkdownDocEditContent({
     } finally {
       savingRef.current = false;
     }
-  }, [onPersist, toMarkdown]);
+  }, [onPersist]);
 
   // ⌘S / Ctrl+S 保存
   useEffect(() => {
@@ -155,44 +138,7 @@ export function MarkdownDocEditContent({
         </button>
       </div>
       <div className="mx-auto max-w-3xl px-6 pb-16">
-        <BlockNoteView
-          editor={editor}
-          theme={dark ? "dark" : "light"}
-          formattingToolbar={false}
-          slashMenu={false}
-          onChange={editorChange}
-        >
-          <AIMenuController />
-          <FormattingToolbarController
-            formattingToolbar={() => (
-              <FormattingToolbar>
-                <BlockTypeSelect />
-                <BasicTextStyleButton basicTextStyle="bold" />
-                <BasicTextStyleButton basicTextStyle="italic" />
-                <BasicTextStyleButton basicTextStyle="underline" />
-                <BasicTextStyleButton basicTextStyle="strike" />
-                <BasicTextStyleButton basicTextStyle="code" />
-                <TextAlignButton textAlignment="left" />
-                <TextAlignButton textAlignment="center" />
-                <TextAlignButton textAlignment="right" />
-                <ColorStyleButton />
-                <NestBlockButton />
-                <UnnestBlockButton />
-                <CreateLinkButton />
-                <AIToolbarButton />
-              </FormattingToolbar>
-            )}
-          />
-          <SuggestionMenuController
-            triggerCharacter="/"
-            getItems={async (query) =>
-              filterSuggestionItems(
-                [...getDefaultReactSlashMenuItems(editor)],
-                query,
-              ).concat(filterSuggestionItems(getAISlashMenuItems(editor), query))
-            }
-          />
-        </BlockNoteView>
+        <DocEditSurface editor={editor} dark={dark} onChange={editorChange} />
       </div>
     </div>
   );

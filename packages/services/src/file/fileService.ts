@@ -577,6 +577,39 @@ export function createFileService(options: CreateFileServiceOptions = {}): IFile
       await rename(tempPath, params.path);
       return { bytesWritten: buffer.byteLength };
     },
+    async writeDocxFromHtml(params: {
+      path: string;
+      html: string;
+    }): Promise<{ bytesWritten: number }> {
+      const targetStat = await stat(params.path).catch((error: unknown) => {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+        throw error;
+      });
+      if (targetStat && !targetStat.isFile()) {
+        throw new Error(`Path is not a file: ${params.path}`);
+      }
+      // @ts-expect-error -- html-to-docx 无类型声明（UMD 包）
+      const htmlToDocxModule = (await import("html-to-docx")).default as
+        | undefined
+        | ((html: string, opts?: unknown, userOpts?: unknown) => Promise<ArrayBuffer>);
+      if (typeof htmlToDocxModule !== "function") {
+        throw new Error("html-to-docx module unavailable");
+      }
+      const out = await htmlToDocxModule(params.html, undefined, {
+        table: { row: { cantSplit: true } },
+      });
+      const buffer = Buffer.from(out as ArrayBuffer);
+      const tempPath = `${params.path}.zcode-edit-tmp-${process.pid}-${Date.now()}`;
+      const handle = await open(tempPath, "w");
+      try {
+        await handle.writeFile(buffer);
+      } finally {
+        await handle.close();
+      }
+      const { rename } = await import("node:fs/promises");
+      await rename(tempPath, params.path);
+      return { bytesWritten: buffer.byteLength };
+    },
     async readMediaPreview(params: { path: string; maxBytes?: number }): Promise<FileMediaPreview> {
       const fileStat = await stat(params.path);
       if (!fileStat.isFile()) {

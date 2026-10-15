@@ -38,6 +38,12 @@ export interface IFileService {
    * 超过大小上限抛错；父目录不存在时抛错（预览 pane 只打开已存在的文件）。
    */
   writeTextFile(params: { path: string; content: string }): Promise<{ bytesWritten: number }>;
+  /**
+   * 文档编辑 pane 保存 docx 用：HTML（BlockNote blocksToHTMLLossy 产物）
+   * 经 html-to-docx 生成 .docx 后原子落盘。仅接受 UTF-8 HTML 文本，
+   * 二进制组装在 host 侧完成。
+   */
+  writeDocxFromHtml(params: { path: string; html: string }): Promise<{ bytesWritten: number }>;
   readMediaPreview(params: { path: string; maxBytes?: number }): Promise<FileMediaPreview>;
   /**
    * 按偏移读取文件的一段原始字节，供大二进制文件（如 PDF）按需分段加载。

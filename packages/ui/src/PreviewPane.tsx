@@ -75,6 +75,7 @@ import {
 } from "@/lib/codeCommentContext.js";
 import { getWorkspaceFileRelativePath } from "@/workspace-file-tree/model.js";
 import { resolveWorkspaceEditorSelection } from "@/lib/workspaceEditorSelection.js";
+import { createAgentDocEditTransport } from "@/docEdit/docEditAgentTransport.js";
 import {
   assertPptxPreviewDataComplete,
   isPptxPreviewIncompleteFileError,
@@ -409,7 +410,10 @@ function getPreviewPaneDisplayOptions(
 ) {
   const canToggleMarkdownView =
     source !== null &&
-    (isMarkdownSource(source) || (source.type === "file" && isMarkdownFilePath(source.path)));
+    (isMarkdownSource(source) ||
+      (source.type === "file" && isMarkdownFilePath(source.path)) ||
+      // docx 也走「富文本编辑」档（mammoth 打开 + host 组装保存）
+      (source.type === "file" && getOfficeFilePreviewKind(source.path) === "docx"));
   const canToggleSvgView =
     source !== null &&
     (isSvgSource(source) || (source.type === "file" && isSvgFilePath(source.path)));
@@ -515,11 +519,38 @@ export function PreviewPane({
     matchedOpenContext.isRemoteWorkspace,
   );
   const fileActions = useFileContextActions();
-  const { fileService, fileWatcherService, mediaPreviewService } = useWorkspaceServices(
-    sourceWorkspacePath,
-    source?.workspaceRemoteSessionId,
-    source?.workspaceIdentity,
-  );
+  const { fileService, fileWatcherService, mediaPreviewService, zcodeAgentService, modelSelectionService } =
+    useWorkspaceServices(sourceWorkspacePath, source?.workspaceRemoteSessionId, source?.workspaceIdentity);
+
+  // 文档编辑 pane 的真实模型 transport：复用 ZCode agent runtime（workspace/generateText）
+  // 与账号层凭证；无 workspace 时回退演示 transport（组件内部处理）。
+  const docEditTransport = useMemo(() => {
+    if (!sourceWorkspacePath) return undefined;
+    return createAgentDocEditTransport(
+      {
+        generateWorkspaceText: (params) =>
+          zcodeAgentService.generateWorkspaceText({
+            workspacePath: params.workspacePath,
+            ...(params.workspaceIdentity ? { workspaceIdentity: params.workspaceIdentity } : {}),
+            selection: params.selection as never,
+            ...(params.messages ? { messages: params.messages as never } : {}),
+            ...(params.tools ? { tools: params.tools as never } : {}),
+            querySource: params.querySource,
+            ...(params.maxOutputTokens ? { maxOutputTokens: params.maxOutputTokens } : {}),
+            ...(params.requestTimeoutMs ? { requestTimeoutMs: params.requestTimeoutMs } : {}),
+          }),
+        readPreferredSelection: async () => {
+          const view = await modelSelectionService.getView();
+          return view.preferredSelection ?? null;
+        },
+      },
+      {
+        path: sourceWorkspacePath,
+        key: source?.workspaceIdentity || sourceWorkspacePath,
+        ...(source?.workspaceIdentity ? { identity: source.workspaceIdentity } : {}),
+      },
+    );
+  }, [zcodeAgentService, modelSelectionService, sourceWorkspacePath, source?.workspaceIdentity]);
   const [filePreview, setFilePreview] = useState<FileTextSlice | null>(null);
   const [fileTooLarge, setFileTooLarge] = useState(false);
   const [loadingInitial, setLoadingInitial] = useState(false);
@@ -718,6 +749,23 @@ export function PreviewPane({
         throw new Error("Document has no file path to save");
       }
       await fileService.writeTextFile({ path, content: markdown });
+      setDocEditSaveTick((tick) => tick + 1);
+    },
+    [fileService, source?.path],
+  );
+
+  // docx 编辑 pane：整文件字节读取封装 + HTML 经 host 组装 .docx 落盘
+  const handleDocxReadBytes = useCallback(
+    (path: string) => fileService.readFileRange({ path, offset: 0, length: 50 * 1024 * 1024 }),
+    [fileService],
+  );
+  const handleDocxPersist = useCallback(
+    async (html: string) => {
+      const path = source?.path;
+      if (!path) {
+        throw new Error("Document has no file path to save");
+      }
+      await fileService.writeDocxFromHtml({ path, html });
       setDocEditSaveTick((tick) => tick + 1);
     },
     [fileService, source?.path],
@@ -1809,6 +1857,9 @@ export function PreviewPane({
             }
             markdownViewMode={markdownViewMode}
             onMarkdownPersist={handleMarkdownPersist}
+            onDocxReadBytes={handleDocxReadBytes}
+            onDocxPersist={handleDocxPersist}
+            docEditTransport={docEditTransport}
             svgViewMode={svgViewMode}
             wrapLongLines={wrapLongLines}
             codeComments={codeComments}
