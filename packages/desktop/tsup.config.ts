@@ -125,6 +125,9 @@ const desktopNodeRuntimeExternals = [
   "node-forge",
   // ZIP 解包器内部依赖 CommonJS require("fs")，不能内联到 ESM main/host 产物。
   "yauzl",
+  // html-to-docx（docx 编辑 pane 保存用）内部动态 require("url")，内联进 host
+  // bundle 会报 Dynamic require of "url" is not supported，与 node-forge 同理。
+  "html-to-docx",
 ];
 
 function createDevReadyMarkerHook(target: "main" | "host" | "preload"): string {
