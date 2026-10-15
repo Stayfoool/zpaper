@@ -221,3 +221,91 @@ export function JustifyAlignButton() {
     </Components.FormattingToolbar.Button>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* 常驻工具栏（固定顶栏）专用控件                          */
+/* ------------------------------------------------------------------ */
+
+export function UndoButton() {
+  const Components = useComponentsContext()!;
+  const editor = useBlockNoteEditor<BlockSchema, InlineContentSchema, StyleSchema>();
+
+  return (
+    <Components.FormattingToolbar.Button
+      className="bn-button-undo"
+      label="撤销"
+      mainTooltip="撤销 (⌘Z)"
+      onClick={() => {
+        editor.focus();
+        editor.undo();
+      }}
+    >
+      ↺
+    </Components.FormattingToolbar.Button>
+  );
+}
+
+export function RedoButton() {
+  const Components = useComponentsContext()!;
+  const editor = useBlockNoteEditor<BlockSchema, InlineContentSchema, StyleSchema>();
+
+  return (
+    <Components.FormattingToolbar.Button
+      className="bn-button-redo"
+      label="重做"
+      mainTooltip="重做 (⇧⌘Z)"
+      onClick={() => {
+        editor.focus();
+        editor.redo();
+      }}
+    >
+      ↻
+    </Components.FormattingToolbar.Button>
+  );
+}
+
+export function InsertPageBreakButton() {
+  const Components = useComponentsContext()!;
+  const editor = useBlockNoteEditor<BlockSchema, InlineContentSchema, StyleSchema>();
+
+  return (
+    <Components.FormattingToolbar.Button
+      className="bn-button-page-break"
+      label="分页符"
+      mainTooltip="插入分页符"
+      onClick={() => {
+        editor.focus();
+        const { block } = editor.getTextCursorPosition();
+        editor.insertBlocks([{ type: "pageBreak" } as any], block as any, "after");
+      }}
+    >
+      <span style={{ letterSpacing: 0.5 }}>⤓</span>
+    </Components.FormattingToolbar.Button>
+  );
+}
+
+/** 常驻工具栏的 AI 入口：在当前光标块打开 xl-ai 的 AI 菜单。 */
+export function RibbonAIButton() {
+  const Components = useComponentsContext()!;
+  const editor = useBlockNoteEditor<BlockSchema, InlineContentSchema, StyleSchema>();
+
+  return (
+    <Components.FormattingToolbar.Button
+      className="bn-button-ribbon-ai"
+      label="AI 编辑"
+      mainTooltip="AI 编辑（就地修改，修订高亮可接受/拒绝）"
+      onClick={() => {
+        editor.focus();
+        const em = (editor as any)._extensionManager;
+        const ai = em?.extensions?.find(
+          (x: any) => typeof x.openAIMenuAtBlock === "function",
+        );
+        if (!ai) return;
+        const { block } = editor.getTextCursorPosition();
+        ai.openAIMenuAtBlock(block.id);
+      }}
+    >
+      <span style={{ color: "#4f8ef7", fontWeight: 700 }}>AI</span>
+    </Components.FormattingToolbar.Button>
+  );
+}

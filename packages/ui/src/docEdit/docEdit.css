@@ -18,3 +18,39 @@
 .zp-doc-edit .bn-ai-menu {
   max-width: 100%;
 }
+
+/* ── 常驻工具栏（固定顶栏）──────────────────────────── */
+
+.zp-doc-edit-ribbon-host {
+  position: sticky;
+  top: 44px; /* 保存栏（sticky top-0）之下 */
+  z-index: 30;
+  margin-bottom: 8px;
+}
+
+.zp-doc-edit-ribbon .zp-ribbon-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px;
+}
+
+.zp-doc-edit-ribbon .zp-ribbon-group + .zp-ribbon-group {
+  border-left: 1px solid var(--sidebar-border, rgba(128, 128, 128, 0.25));
+  padding-left: 8px;
+}
+
+/* Mantine 工具栏按钮在常驻栏里去底色，贴近 Word ribbon 质感 */
+.zp-doc-edit-ribbon .bn-button,
+.zp-doc-edit-ribbon .mantine-Button-root {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  font-size: 13px;
+  min-width: 26px;
+  padding: 4px 6px;
+}
+
+.zp-doc-edit-ribbon .bn-button:hover {
+  background: rgba(128, 128, 128, 0.12);
+}
