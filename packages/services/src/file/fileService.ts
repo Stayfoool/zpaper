@@ -31,6 +31,8 @@ import { createServiceLogger } from "../logger/serviceLogger.js";
 import { getConversationWorkspaceDir } from "../paths.js";
 const DEFAULT_TEXT_READ_BYTES = 128 * 1024;
 const MAX_TEXT_READ_BYTES = 256 * 1024;
+// 文档编辑 pane 保存上限：预览读取本身封顶 256KB，能打开就能存回。
+const MAX_TEXT_WRITE_BYTES = 256 * 1024;
 const DEFAULT_MEDIA_PREVIEW_BYTES = 4 * 1024 * 1024;
 const MAX_MEDIA_PREVIEW_BYTES = 8 * 1024 * 1024;
 const DEFAULT_BINARY_READ_BYTES = 256 * 1024;
@@ -545,6 +547,35 @@ export function createFileService(options: CreateFileServiceOptions = {}): IFile
       } finally {
         await handle.close();
       }
+    },
+    async writeTextFile(params: {
+      path: string;
+      content: string;
+    }): Promise<{ bytesWritten: number }> {
+      if (params.content.length > MAX_TEXT_WRITE_BYTES) {
+        throw new Error(
+          `Text too large to save: ${params.content.length} bytes exceeds ${MAX_TEXT_WRITE_BYTES}`,
+        );
+      }
+      const targetStat = await stat(params.path).catch((error: unknown) => {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+        throw error;
+      });
+      if (targetStat && !targetStat.isFile()) {
+        throw new Error(`Path is not a file: ${params.path}`);
+      }
+      const buffer = Buffer.from(params.content, "utf8");
+      // 临时文件 + rename 原子落盘，避免半写状态损坏原文件。
+      const tempPath = `${params.path}.zcode-edit-tmp-${process.pid}-${Date.now()}`;
+      const handle = await open(tempPath, "w");
+      try {
+        await handle.writeFile(buffer);
+      } finally {
+        await handle.close();
+      }
+      const { rename } = await import("node:fs/promises");
+      await rename(tempPath, params.path);
+      return { bytesWritten: buffer.byteLength };
     },
     async readMediaPreview(params: { path: string; maxBytes?: number }): Promise<FileMediaPreview> {
       const fileStat = await stat(params.path);

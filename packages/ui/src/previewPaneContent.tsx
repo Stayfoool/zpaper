@@ -9,6 +9,7 @@ import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import type { CodePreviewSettings } from "@/store/index.js";
 import type { CodeCommentLabels } from "@/components/ui/code-viewer.js";
 import { MarkdownPreviewContent } from "@/previewPaneMarkdownContent.js";
+import { MarkdownDocEditContent } from "@/docEdit/markdownDocEditContent.js";
 import { CodeContent } from "@/previewPaneCodeContent.js";
 import { ImagePreviewContent, SvgPreviewContent } from "@/previewPaneImageContent.js";
 import { PreviewPaneMediaContent } from "@/previewPaneMediaContent.js";
@@ -59,7 +60,9 @@ interface PreviewPaneContentProps {
   workspacePath?: string;
   onOpenBrowserUrl?: (url: string) => void;
   markdownSelectionTarget?: MarkdownSelectionTarget;
-  markdownViewMode: "preview" | "code";
+  markdownViewMode: "preview" | "code" | "edit";
+  /** 文档编辑 pane 保存回调（仅 edit 模式使用），由 PreviewPane 经 FileService 落盘 */
+  onMarkdownPersist?: (markdown: string) => Promise<void>;
   svgViewMode: "preview" | "code";
   wrapLongLines: boolean;
   codeComments: readonly CodeCommentPreview[];
@@ -120,6 +123,7 @@ export function PreviewPaneContent({
   onOpenBrowserUrl,
   markdownSelectionTarget,
   markdownViewMode,
+  onMarkdownPersist,
   svgViewMode,
   wrapLongLines,
   codeComments,
@@ -195,6 +199,16 @@ export function PreviewPaneContent({
   if (source.type === "text") {
     const isMarkdownSource = source.language === "markdown";
     const isSvgSource = isSvgPath(source.path);
+    if (isMarkdownSource && markdownViewMode === "edit" && source.path && onMarkdownPersist) {
+      return (
+        <MarkdownDocEditContent
+          content={source.content}
+          sourceKey={source.path}
+          dark={resolvedTheme === "dark"}
+          onPersist={onMarkdownPersist}
+        />
+      );
+    }
     if (isMarkdownSource && markdownViewMode === "preview") {
       return (
         <MarkdownPreviewContent
@@ -410,6 +424,16 @@ export function PreviewPaneContent({
       : null;
   const isMarkdownFile = fileLanguage === "markdown";
   const isSvgFile = isSvgPath(source.path);
+  if (source.type !== "code-review" && isMarkdownFile && markdownViewMode === "edit" && source.path && onMarkdownPersist) {
+    return (
+      <MarkdownDocEditContent
+        content={filePreview.content}
+        sourceKey={source.path}
+        dark={resolvedTheme === "dark"}
+        onPersist={onMarkdownPersist}
+      />
+    );
+  }
   if (source.type !== "code-review" && isMarkdownFile && markdownViewMode === "preview") {
     return (
       <MarkdownPreviewContent

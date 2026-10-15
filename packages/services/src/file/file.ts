@@ -33,6 +33,11 @@ export interface IFileService {
   createDefaultWorkspace(): Promise<{ path: string }>;
   createScratchWorkspace(params: { name: string }): Promise<{ path: string }>;
   readTextFile(params: { path: string; offset?: number; length?: number }): Promise<FileTextSlice>;
+  /**
+   * 文档编辑 pane 保存用：UTF-8 覆写文本文件（临时文件 + rename 原子落盘）。
+   * 超过大小上限抛错；父目录不存在时抛错（预览 pane 只打开已存在的文件）。
+   */
+  writeTextFile(params: { path: string; content: string }): Promise<{ bytesWritten: number }>;
   readMediaPreview(params: { path: string; maxBytes?: number }): Promise<FileMediaPreview>;
   /**
    * 按偏移读取文件的一段原始字节，供大二进制文件（如 PDF）按需分段加载。

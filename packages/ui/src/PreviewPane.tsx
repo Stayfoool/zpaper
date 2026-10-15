@@ -19,6 +19,7 @@ import {
   ExternalLinkIcon,
   FileCode2Icon,
   CopyIcon,
+  PenLine,
 } from "lucide-react";
 import { nanoid } from "nanoid";
 import { Button } from "@/components/ui/button.js";
@@ -402,7 +403,7 @@ function isPlainCodeSource(source: CodeViewerSource | null): boolean {
 function getPreviewPaneDisplayOptions(
   source: CodeViewerSource | null,
   viewModes: {
-    markdownViewMode?: "preview" | "code";
+    markdownViewMode?: "preview" | "code" | "edit";
     svgViewMode?: "preview" | "code";
   } = {},
 ) {
@@ -548,7 +549,10 @@ export function PreviewPane({
   const [error, setError] = useState<string | null>(null);
   const [installedEditors, setInstalledEditors] = useState<EditorInfo[]>([]);
   const [preferredEditorId] = useState<string | null>(() => readLastSelectedEditorId());
-  const [markdownViewMode, setMarkdownViewMode] = useState<"preview" | "code">("preview");
+  const [markdownViewMode, setMarkdownViewMode] = useState<"preview" | "code" | "edit">("preview");
+  // 文档编辑 pane 保存后递增，驱动下方读取 effect 重新拉取文件内容，
+  // 使切回「预览」时立即看到刚保存的内容。
+  const [docEditSaveTick, setDocEditSaveTick] = useState(0);
   const [svgViewMode, setSvgViewMode] = useState<"preview" | "code">("preview");
   const [wrapLongLinesOverride, setWrapLongLinesOverride] = useState<boolean | null>(null);
   const [breadcrumbMaskState, setBreadcrumbMaskState] = useState<BreadcrumbMaskState>("none");
@@ -704,6 +708,20 @@ export function PreviewPane({
     );
     setWrapLongLinesOverride(null);
   }, [source]);
+
+  // 文档编辑 pane 的保存：FileService.writeTextFile 原子落盘，成功后递增
+  // docEditSaveTick 触发重新读取，保证切回「预览」即见最新内容。
+  const handleMarkdownPersist = useCallback(
+    async (markdown: string) => {
+      const path = source?.path;
+      if (!path) {
+        throw new Error("Document has no file path to save");
+      }
+      await fileService.writeTextFile({ path, content: markdown });
+      setDocEditSaveTick((tick) => tick + 1);
+    },
+    [fileService, source?.path],
+  );
 
   const handleSubmitCodeComment = useCallback(
     (params: { range: CodeCommentRange; selectedText: string; comment: string }) => {
@@ -932,7 +950,7 @@ export function PreviewPane({
     return () => {
       disposed = true;
     };
-  }, [fileService, fileSource, intl]);
+  }, [fileService, fileSource, intl, docEditSaveTick]);
 
   useEffect(() => {
     let disposed = false;
@@ -1613,13 +1631,19 @@ export function PreviewPane({
                     <DropdownMenuRadioGroup
                       value={markdownViewMode}
                       onValueChange={(value) => {
-                        setMarkdownViewMode(value as "preview" | "code");
+                        setMarkdownViewMode(value as "preview" | "code" | "edit");
                       }}
                     >
                       <DropdownMenuRadioItem value="preview">
                         <EyeIcon className="size-4" />
                         {intl.formatMessage({
                           id: "codeViewer.markdownPreview",
+                        })}
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="edit">
+                        <PenLine className="size-4" />
+                        {intl.formatMessage({
+                          id: "codeViewer.markdownEdit",
                         })}
                       </DropdownMenuRadioItem>
                       <DropdownMenuRadioItem value="code">
@@ -1784,6 +1808,7 @@ export function PreviewPane({
                 : undefined
             }
             markdownViewMode={markdownViewMode}
+            onMarkdownPersist={handleMarkdownPersist}
             svgViewMode={svgViewMode}
             wrapLongLines={wrapLongLines}
             codeComments={codeComments}
