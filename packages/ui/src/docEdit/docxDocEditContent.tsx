@@ -29,6 +29,8 @@ interface DocxDocEditContentProps {
   /** 保存：父级经 FileService.writeDocxFromHtml 落盘 */
   onPersist: (html: string) => Promise<void>;
   aiTransport?: ChatTransport<UIMessage>;
+  /** 当前选中模型的展示名，为空表示未选择模型 */
+  modelLabel?: string;
 }
 
 type LoadState =
@@ -49,6 +51,7 @@ export function DocxDocEditContent({
   readBytes,
   onPersist,
   aiTransport,
+  modelLabel,
 }: DocxDocEditContentProps) {
   const { intl, locale } = useZCodeIntl();
   const [loadState, setLoadState] = useState<LoadState>({ kind: "loading" });
@@ -160,6 +163,20 @@ export function DocxDocEditContent({
   return (
     <div className="relative h-full w-full overflow-auto bg-background">
       <div className="pointer-events-none sticky top-0 z-10 flex items-center justify-end gap-2 bg-background/80 px-3 py-1.5 backdrop-blur-sm">
+        <span
+          className="pointer-events-auto rounded-md border border-border px-2 py-0.5 text-xs text-foreground-subtle"
+          title={
+            aiTransport
+              ? intl.formatMessage({ id: "codeViewer.docEdit.modelBadgeTitle" })
+              : intl.formatMessage({ id: "codeViewer.docEdit.demoBadgeTitle" })
+          }
+        >
+          {modelLabel
+            ? `AI：${modelLabel}`
+            : aiTransport
+              ? intl.formatMessage({ id: "codeViewer.docEdit.noModel" })
+              : intl.formatMessage({ id: "codeViewer.docEdit.demoMode" })}
+        </span>
         {statusText ? (
           <span className="pointer-events-auto text-xs text-foreground-subtle">{statusText}</span>
         ) : null}

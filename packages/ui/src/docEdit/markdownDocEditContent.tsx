@@ -29,6 +29,8 @@ interface MarkdownDocEditContentProps {
    * 缺省时回退到演示 transport（无 key 也能演示交互）。
    */
   aiTransport?: ChatTransport<UIMessage>;
+  /** 当前选中模型的展示名（如 provider/model），为空表示未选择模型 */
+  modelLabel?: string;
 }
 
 type SaveState = { kind: "idle" } | { kind: "dirty" } | { kind: "saving" } | { kind: "saved" } | { kind: "error"; message: string };
@@ -39,6 +41,7 @@ export function MarkdownDocEditContent({
   dark,
   onPersist,
   aiTransport,
+  modelLabel,
 }: MarkdownDocEditContentProps) {
   const { intl, locale } = useZCodeIntl();
   const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
@@ -125,6 +128,20 @@ export function MarkdownDocEditContent({
   return (
     <div className="relative h-full w-full overflow-auto bg-background">
       <div className="pointer-events-none sticky top-0 z-10 flex items-center justify-end gap-2 bg-background/80 px-3 py-1.5 backdrop-blur-sm">
+        <span
+          className="pointer-events-auto rounded-md border border-border px-2 py-0.5 text-xs text-foreground-subtle"
+          title={
+            aiTransport
+              ? intl.formatMessage({ id: "codeViewer.docEdit.modelBadgeTitle" })
+              : intl.formatMessage({ id: "codeViewer.docEdit.demoBadgeTitle" })
+          }
+        >
+          {modelLabel
+            ? `AI：${modelLabel}`
+            : aiTransport
+              ? intl.formatMessage({ id: "codeViewer.docEdit.noModel" })
+              : intl.formatMessage({ id: "codeViewer.docEdit.demoMode" })}
+        </span>
         {statusText ? (
           <span className="pointer-events-auto text-xs text-foreground-subtle">{statusText}</span>
         ) : null}

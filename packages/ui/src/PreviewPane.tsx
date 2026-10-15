@@ -740,6 +740,34 @@ export function PreviewPane({
     setWrapLongLinesOverride(null);
   }, [source]);
 
+  // 文档编辑 pane：当前模型标签（第三方 API / 账号模型都走 provider registry，
+  // 设置页切换模型后重开编辑 pane 即刷新）
+  const [docEditModelLabel, setDocEditModelLabel] = useState<string | null>(null);
+  useEffect(() => {
+    let disposed = false;
+    void modelSelectionService
+      .getView()
+      .then((view) => {
+        if (disposed) return;
+        const selection = view.preferredSelection;
+        if (!selection) {
+          setDocEditModelLabel(null);
+          return;
+        }
+        setDocEditModelLabel(
+          selection.providerId.startsWith("account:")
+            ? selection.modelId
+            : `${selection.providerId}/${selection.modelId}`,
+        );
+      })
+      .catch(() => {
+        if (!disposed) setDocEditModelLabel(null);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [modelSelectionService, docEditSaveTick]);
+
   // 文档编辑 pane 的保存：FileService.writeTextFile 原子落盘，成功后递增
   // docEditSaveTick 触发重新读取，保证切回「预览」即见最新内容。
   const handleMarkdownPersist = useCallback(
@@ -1860,6 +1888,7 @@ export function PreviewPane({
             onDocxReadBytes={handleDocxReadBytes}
             onDocxPersist={handleDocxPersist}
             docEditTransport={docEditTransport}
+            docEditModelLabel={docEditModelLabel ?? undefined}
             svgViewMode={svgViewMode}
             wrapLongLines={wrapLongLines}
             codeComments={codeComments}

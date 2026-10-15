@@ -70,6 +70,8 @@ interface PreviewPaneContentProps {
   onDocxPersist?: (html: string) => Promise<void>;
   /** 文档编辑 pane 的 AI transport（真实模型通道），缺省回退演示 transport */
   docEditTransport?: ComponentProps<typeof MarkdownDocEditContent>["aiTransport"];
+  /** 当前选中模型展示名（透传给编辑 pane 顶栏徽标） */
+  docEditModelLabel?: string;
   svgViewMode: "preview" | "code";
   wrapLongLines: boolean;
   codeComments: readonly CodeCommentPreview[];
@@ -134,6 +136,7 @@ export function PreviewPaneContent({
   onDocxReadBytes,
   onDocxPersist,
   docEditTransport,
+  docEditModelLabel,
   svgViewMode,
   wrapLongLines,
   codeComments,
@@ -217,6 +220,7 @@ export function PreviewPaneContent({
           dark={resolvedTheme === "dark"}
           onPersist={onMarkdownPersist}
           {...(docEditTransport ? { aiTransport: docEditTransport } : {})}
+          {...(docEditModelLabel ? { modelLabel: docEditModelLabel } : {})}
         />
       );
     }
@@ -341,6 +345,7 @@ export function PreviewPaneContent({
         readBytes={onDocxReadBytes}
         onPersist={onDocxPersist}
         {...(docEditTransport ? { aiTransport: docEditTransport } : {})}
+        {...(docEditModelLabel ? { modelLabel: docEditModelLabel } : {})}
       />
     );
   }
@@ -454,6 +459,7 @@ export function PreviewPaneContent({
         dark={resolvedTheme === "dark"}
         onPersist={onMarkdownPersist}
         {...(docEditTransport ? { aiTransport: docEditTransport } : {})}
+        {...(docEditModelLabel ? { modelLabel: docEditModelLabel } : {})}
       />
     );
   }
