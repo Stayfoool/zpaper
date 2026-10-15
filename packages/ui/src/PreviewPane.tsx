@@ -782,9 +782,20 @@ export function PreviewPane({
     [fileService, source?.path],
   );
 
-  // docx 编辑 pane：整文件字节读取封装 + HTML 经 host 组装 .docx 落盘
+  // docx 编辑 pane：字节读取走 readBinaryPreview（base64 通道，与官方 docx
+  // 预览一致——readFileRange 的顶层 Uint8Array 经 ProxyChannel 到渲染端会
+  // 损坏，实测 mammoth 报 Corrupted zip）；保存经 writeDocxFromHtml 组装落盘
   const handleDocxReadBytes = useCallback(
-    (path: string) => fileService.readFileRange({ path, offset: 0, length: 50 * 1024 * 1024 }),
+    async (path: string) => {
+      const preview = await fileService.readBinaryPreview({
+        path,
+        maxBytes: 50 * 1024 * 1024,
+      });
+      const bin = atob(preview.dataBase64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return bytes;
+    },
     [fileService],
   );
   const handleDocxPersist = useCallback(
